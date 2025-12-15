@@ -1,0 +1,49 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="card">
+    <h2 style="margin:0 0 .25rem;">Error log</h2>
+    <p class="muted" style="margin:0 0 .5rem;">Recent processing issues. Mark entries resolved after review.</p>
+    <table>
+        <thead>
+            <tr>
+                <th>When</th>
+                <th>Location</th>
+                <th>Message</th>
+                <th>Resume</th>
+                <th>Status</th>
+                <th>Action</th>
+            </tr>
+        </thead>
+        <tbody>
+        {% for log in logs %}
+            <tr>
+                <td>{{ log.created_at }}</td>
+                <td>{{ log.location }}</td>
+                <td>
+                    <div>{{ log.message }}</div>
+                    {% if log.details %}<div class="muted" style="font-size:.85rem;">{{ log.details }}</div>{% endif %}
+                </td>
+                <td>{% if log.resume %}{{ log.resume.attachment_name }}{% else %}-{% endif %}</td>
+                <td>
+                    {% if log.resolved %}
+                        <span class="badge success">Resolved</span>
+                    {% else %}
+                        <span class="badge muted">Open</span>
+                    {% endif %}
+                </td>
+                <td>
+                    {% if not log.resolved %}
+                    <form method="post" action="{% url 'resolve_error' log.id %}">
+                        {% csrf_token %}
+                        <button type="submit" class="secondary">Mark resolved</button>
+                    </form>
+                    {% else %}-{% endif %}
+                </td>
+            </tr>
+        {% empty %}
+            <tr><td colspan="6" class="muted">No errors recorded.</td></tr>
+        {% endfor %}
+        </tbody>
+    </table>
+</section>
+{% endblock %}

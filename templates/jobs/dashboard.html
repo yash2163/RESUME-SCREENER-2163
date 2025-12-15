@@ -1,0 +1,363 @@
+{% extends "base.html" %}
+
+{% block content %}
+
+<div class="dashboard-tabs">
+    <a href="?tab=inbox" class="tab-link {% if current_tab == 'inbox' %}active{% endif %}">
+        Inbox
+    </a>
+    <a href="?tab=interviews" class="tab-link {% if current_tab == 'interviews' %}active{% endif %}">
+        Interviews
+    </a>
+    <a href="?tab=rejected" class="tab-link {% if current_tab == 'rejected' %}active{% endif %}">
+        Rejected
+    </a>
+    <a href="?tab=hired" class="tab-link {% if current_tab == 'hired' %}active{% endif %}">
+        Hired
+    </a>
+</div>
+
+<div class="filters-bar">
+    <div class="dashboard-header">
+        <h2>Dashboard</h2>
+        <p class="muted">
+            {% if current_tab == 'inbox' %}Active Applications{% elif current_tab == 'interviews' %}Scheduled Interviews{% elif current_tab == 'rejected' %}Rejected Candidates{% else %}Hired Candidates{% endif %}
+        </p>
+    </div>
+
+    <form method="get" id="dashboard-filter-form">
+        <input type="hidden" name="tab" value="{{ current_tab }}">
+
+        <div class="filter-group">
+            <span class="label-text">Filter by JD</span>
+            <select name="job">
+                <option value="">All active</option>
+                {% for job in jobs %}
+                    <option value="{{ job.id }}" {% if selected_job and job.id == selected_job.id %}selected{% endif %}>
+                        {{ job.name }}
+                    </option>
+                {% endfor %}
+            </select>
+        </div>
+
+        <div class="filter-group">
+            <span class="label-text">Sort</span>
+            <select name="sort">
+                <option value="score_date" {% if sort == "score_date" %}selected{% endif %}>Score then Date</option>
+                <option value="date_score" {% if sort == "date_score" %}selected{% endif %}>Date then Score</option>
+                <option value="score_desc" {% if sort == "score_desc" %}selected{% endif %}>Score (high→low)</option>
+                <option value="score_asc" {% if sort == "score_asc" %}selected{% endif %}>Score (low→high)</option>
+                <option value="date_desc" {% if sort == "date_desc" %}selected{% endif %}>Newest first</option>
+                <option value="date_asc" {% if sort == "date_asc" %}selected{% endif %}>Oldest first</option>
+            </select>
+        </div>
+
+        <div class="filter-group">
+            <span class="label-text">View</span>
+            <select name="view">
+                <option value="tiles" {% if view_mode == "tiles" %}selected{% endif %}>Tiles</option>
+                <option value="table" {% if view_mode == "table" %}selected{% endif %}>Table</option>
+            </select>
+        </div>
+
+        <div class="filter-group search-group">
+            <span class="label-text">Message search</span>
+            <input type="text" id="chat-inline" placeholder="Free-form search (optional)">
+        </div>
+
+        <input type="hidden" id="chat-session-id" value="{{ chat_session.session_key }}">
+        <input type="hidden" name="apply" value="1">
+        
+        <div class="btn-div">
+             <div class="filter-group">
+                <span class="label-text">Favorites</span>
+                <label class="switch">
+                    <input type="checkbox" name="favorites" value="1" {% if request.GET.favorites %}checked{% endif %} onchange="this.form.submit()">
+                    <span class="slider round"></span>
+                </label>
+            </div>   
+            <div class="button-group">
+                <button type="submit" class="btn-primary">Apply</button>
+                <a role="button" class="btn-primary" href="{% url 'export_scores_csv' %}?job={{ request.GET.job }}&sort={{ request.GET.sort }}">Download CSV</a>
+            </div>
+        </div>
+    </form>
+</div>
+
+<input type="hidden" id="csrf-token" value="{{ csrf_token }}">
+
+{% if not show_results %}
+    <div class="state-message">
+        <p class="muted">Click <strong>Apply</strong> to load results.</p>
+    </div>
+{% elif total_count == 0 %}
+    <div class="state-message">
+        <p>No candidates found in <strong>{{ current_tab|title }}</strong>.</p>
+    </div>
+{% else %}
+    <div class="results-meta">
+        <span class="muted" id="result-count">
+            Showing {{ page_obj.end_index }} of {{ total_count }} result{% if total_count != 1 %}s{% endif %}
+        </span>
+    </div>
+
+    <div id="results-wrapper"
+         data-total="{{ total_count }}"
+         data-loaded="{{ page_obj.end_index }}"
+         data-next-page="{% if page_obj.has_next %}{{ page_obj.next_page_number }}{% endif %}"
+         data-view-mode="{{ view_mode }}"
+         data-sort="{{ sort }}"
+         data-job-id="{% if selected_job %}{{ selected_job.id }}{% endif %}"
+         data-page-size="{{ page_size }}"
+         data-current-tab="{{ current_tab }}">
+        
+        {% if view_mode == "table" %}
+        <div class="table-responsive">
+            <table class="score-table">
+                <thead>
+                    <tr>
+                        <th>Job</th>
+                        <th>Resume</th>
+                        <th>Candidate</th>
+                        <th>Status</th>
+                        <th>Contact</th>
+                        <th>Received</th>
+                        <th>Total Score</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody id="score-table-body">
+                    {% include "jobs/partials/score_rows.html" %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="grid-cards" id="score-card-grid">
+            {% include "jobs/partials/score_cards.html" %}
+        </div>
+        {% endif %}
+    </div>
+
+    <div id="scroll-status" class="muted" {% if not page_obj.has_next %}style="display:none;"{% endif %}>
+        {% if page_obj.has_next %}
+            <div class="loading-spinner"></div> Scroll to load more results...
+        {% else %}
+            All results loaded.
+        {% endif %}
+    </div>
+{% endif %}
+
+<script>
+document.addEventListener("DOMContentLoaded", () => {
+    // A. Setup Variables
+    const wrapper = document.getElementById("results-wrapper");
+    const resultCount = document.getElementById("result-count");
+    const status = document.getElementById("scroll-status");
+    const csrfToken = document.getElementById("csrf-token")?.value || "";
+    
+    // B. Infinite Scroll Logic
+    let updateCount = () => {};
+    if (wrapper) {
+        let loading = false;
+        let loaded = Number(wrapper.dataset.loaded || 0);
+        const total = Number(wrapper.dataset.total || 0);
+        const viewMode = wrapper.dataset.viewMode || "tiles";
+        const sort = wrapper.dataset.sort || "score_date";
+        const jobId = wrapper.dataset.jobId || "";
+        const currentTab = wrapper.dataset.currentTab || "inbox";
+        const pageSize = Number(wrapper.dataset.pageSize || 20);
+        const appendTarget = viewMode === "table" ? document.getElementById("score-table-body") : document.getElementById("score-card-grid");
+
+        updateCount = (value) => {
+            loaded = value;
+            wrapper.dataset.loaded = loaded;
+            const totalValue = Number(wrapper.dataset.total || total);
+            if (resultCount) {
+                const plural = totalValue === 1 ? "" : "s";
+                resultCount.textContent = `Showing ${loaded} of ${totalValue} result${plural} (page size ${pageSize})`;
+            }
+        };
+
+        const fetchNext = async () => {
+            const nextPage = wrapper.dataset.nextPage;
+            if (!nextPage || loading) return;
+            loading = true;
+            if (status) {
+                status.style.display = "block";
+                status.textContent = "Loading more results...";
+            }
+            const params = new URLSearchParams({
+                page: nextPage,
+                sort: sort,
+                view: viewMode,
+                page_size: pageSize,
+                apply: "1",
+                tab: currentTab, // Ensure tab persists during scroll
+            });
+            if (jobId) params.append("job", jobId);
+            
+            const favInput = document.querySelector('input[name="favorites"]');
+            if(favInput && favInput.checked) params.append("favorites", "1");
+
+            try {
+                const response = await fetch(`/?${params.toString()}`, {
+                    headers: { "X-Requested-With": "XMLHttpRequest" },
+                });
+                if (!response.ok) throw new Error(`Request failed with status ${response.status}`);
+                
+                const data = await response.json();
+                if (data.html && appendTarget) {
+                    appendTarget.insertAdjacentHTML("beforeend", data.html);
+                }
+                if (data.has_next && data.next_page) {
+                    wrapper.dataset.nextPage = data.next_page;
+                    if (status) status.textContent = "Scroll to load more results...";
+                } else {
+                    wrapper.dataset.nextPage = "";
+                    if (status) status.textContent = "All results loaded.";
+                }
+                if (data.end_index) {
+                    updateCount(data.end_index);
+                } else if (data.added) {
+                    updateCount(Math.min(total, loaded + data.added));
+                }
+            } catch (error) {
+                console.error(error);
+                if (status) status.textContent = "Unable to load more results. Refresh page.";
+            } finally {
+                loading = false;
+            }
+        };
+
+        const handleScroll = () => {
+            if (!wrapper.dataset.nextPage || loading) return;
+            const scrollPosition = window.innerHeight + window.scrollY;
+            const triggerPoint = document.body.offsetHeight - 200;
+            if (scrollPosition >= triggerPoint) fetchNext();
+        };
+
+        window.addEventListener("scroll", handleScroll, { passive: true });
+    }
+
+    // C. Rescore Logic
+    document.addEventListener("submit", async (event) => {
+        const form = event.target.closest(".rescore-form");
+        if (!form) return;
+        event.preventDefault();
+        const submitBtn = form.querySelector("button[type=submit]");
+        const originalText = submitBtn ? submitBtn.textContent : "";
+        if (submitBtn) {
+            submitBtn.disabled = true;
+            submitBtn.textContent = "Rescoring...";
+        }
+        const csrfInput = form.querySelector("input[name=csrfmiddlewaretoken]");
+        const formData = new FormData(form);
+        try {
+            const resp = await fetch(form.action, {
+                method: "POST",
+                headers: {
+                    "X-Requested-With": "XMLHttpRequest",
+                    "X-CSRFToken": csrfInput ? csrfInput.value : "",
+                },
+                body: formData,
+            });
+            const data = await resp.json();
+            if (!data.success) throw new Error(data.message || "Rescore failed");
+            alert(data.message || "Rescored.");
+            // Reload page if status might have changed (e.g. auto-rejected)
+            if(data.total_score && data.total_score < 60) {
+                 window.location.reload(); 
+            }
+        } catch (err) {
+            alert(err.message || "Rescore failed.");
+            if (submitBtn) {
+                submitBtn.disabled = false;
+                submitBtn.textContent = originalText || "Rescore";
+            }
+            return;
+        }
+        if (submitBtn) submitBtn.textContent = "Done";
+    });
+
+    // D. Toggle Flags (Unified Logic for Favorites)
+    document.addEventListener("change", async (event) => {
+        if (!event.target.classList.contains("fav-input") && !event.target.classList.contains("fav-checkbox")) return;
+        
+        const checkbox = event.target;
+        const resumeId = checkbox.dataset.resumeId;
+        const field = "is_favorite"; 
+        const isChecked = checkbox.checked;
+
+        try {
+            const formData = new FormData();
+            formData.append("field", field);
+            formData.append("value", isChecked ? "true" : "false");
+            formData.append("csrfmiddlewaretoken", csrfToken);
+
+            const resp = await fetch(`/resumes/${resumeId}/toggle/`, {
+                method: "POST",
+                headers: { "X-Requested-With": "XMLHttpRequest" },
+                body: formData,
+            });
+            
+            if (!resp.ok) throw new Error("Update failed");
+        } catch (err) {
+            console.error(err);
+            alert("Unable to save favorite status.");
+            checkbox.checked = !isChecked; // Revert visually on error
+        }
+    });
+
+    // E. Chat Search
+    const chatInput = document.getElementById("chat-inline");
+    const chatSessionInput = document.getElementById("chat-session-id");
+    const filterForm = document.querySelector("#dashboard-filter-form");
+    
+    const applyChatResults = (data) => {
+        if (!wrapper) return;
+        const appendTarget = wrapper.dataset.viewMode === "table" ? document.getElementById("score-table-body") : document.getElementById("score-card-grid");
+        if (!appendTarget) return;
+        appendTarget.innerHTML = data.html || "";
+        const count = data.count || 0;
+        wrapper.dataset.loaded = count;
+        wrapper.dataset.total = count;
+        wrapper.dataset.nextPage = "";
+        updateCount(count);
+        if (status) status.textContent = "Showing chat results";
+    };
+
+    filterForm?.addEventListener("submit", async (event) => {
+        const message = chatInput?.value?.trim();
+        if (!message) return; // Allow normal submit if chat is empty
+
+        event.preventDefault();
+        const jobSelect = document.querySelector("select[name=job]");
+        const payload = {
+            message,
+            session_id: chatSessionInput ? chatSessionInput.value : "",
+            job_id: jobSelect ? jobSelect.value : null,
+            view: wrapper ? wrapper.dataset.viewMode : "tiles",
+        };
+        try {
+            const resp = await fetch("{% url 'chat_search' %}", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    "X-Requested-With": "XMLHttpRequest",
+                    "X-CSRFToken": csrfToken,
+                },
+                body: JSON.stringify(payload),
+            });
+            const data = await resp.json();
+            if (chatSessionInput && data.session_id) {
+                chatSessionInput.value = data.session_id;
+            }
+            applyChatResults(data);
+        } catch (err) {
+            console.error(err);
+            alert("Chat search failed. Please retry.");
+        }
+    });
+});
+</script>
+{% endblock %}

@@ -1,0 +1,232 @@
+{% load tz %} 
+{% for score in scores %}
+<article class="card">
+  <div class="score-header">
+    
+    <div class="header-left">
+      <h4 class="candidate-name">
+        {{ score.resume.candidate_name|default:"Unknown Candidate" }}
+      </h4>
+      <div class="job-role">
+        <i class="bi bi-briefcase-fill"></i> 
+        <span>{{ score.job.name }}</span>
+      </div>
+      
+      {% if score.resume.status == 'INTERVIEW_SCHEDULED' %}
+        <span class="status-tag interview" style="font-size:0.75rem; background:#e0f2fe; color:#0369a1; padding:2px 6px; border-radius:4px; margin-left:8px; font-weight:600;">
+            <i class="bi bi-calendar-check"></i> Interview Set
+        </span>
+      {% elif score.resume.status == 'AUTO_REJECTED' %}
+        <span class="status-tag rejected" style="font-size:0.75rem; background:#fee2e2; color:#991b1b; padding:2px 6px; border-radius:4px; margin-left:8px; font-weight:600;">
+            <i class="bi bi-x-circle"></i> Auto Rejected
+        </span>
+      {% elif score.resume.status == 'INTERVIEW_REJECTED' %}
+        <span class="status-tag rejected" style="font-size:0.75rem; background:#fee2e2; color:#991b1b; padding:2px 6px; border-radius:4px; margin-left:8px; font-weight:600;">
+            <i class="bi bi-x-circle"></i> Rejected
+        </span>
+      {% elif score.resume.status == 'HIRED' %}
+        <span class="status-tag hired" style="font-size:0.75rem; background:#dcfce7; color:#166534; padding:2px 6px; border-radius:4px; margin-left:8px; font-weight:600;">
+            <i class="bi bi-trophy-fill"></i> Hired
+        </span>
+      {% endif %}
+    </div>
+
+    <div class="header-right">
+        <div class="score-pill {% if score.total_score|floatformat:0 >= 75 %}score-success{% elif score.total_score|floatformat:0 < 40 %}score-danger{% endif %}">
+            <span class="score-value">{{ score.total_score|floatformat:1 }}</span>
+            <span class="score-label">/ 100</span>
+        </div>
+
+        <div class="action-row">
+            
+            {% if score.resume.signed_url %}
+            <a class="icon-btn" href="{{ score.resume.signed_url }}" target="_blank" title="Download CV">
+                <i class="bi bi-download"></i>
+            </a>
+            {% elif score.resume.file_url %}
+            <a class="icon-btn" href="{{ score.resume.file_url }}" target="_blank" title="Download CV">
+                <i class="bi bi-download"></i>
+            </a>
+            {% endif %}
+
+            {% if score.resume.candidate_email %}
+            <a class="icon-btn" href="mailto:{{ score.resume.candidate_email }}" title="Email Candidate">
+                <i class="bi bi-envelope"></i>
+            </a>
+            {% endif %}
+
+            {% if score.resume.status == 'INTERVIEW_SCHEDULED' %}
+                
+                <form method="post" action="{% url 'update_status' score.id %}" style="display:inline;">
+                    {% csrf_token %}
+                    <input type="hidden" name="action" value="hire">
+                    <button type="submit" class="icon-btn" title="Mark as Hired" style="color: #166534; border-color: #bbf7d0; background: #f0fdf4;">
+                        <i class="bi bi-check-lg"></i>
+                    </button>
+                </form>
+
+                <form method="post" action="{% url 'update_status' score.id %}" style="display:inline;" onsubmit="return confirm('Reject this candidate?');">
+                    {% csrf_token %}
+                    <input type="hidden" name="action" value="reject">
+                    <button type="submit" class="icon-btn" title="Reject Candidate" style="color: #991b1b; border-color: #fecaca; background: #fef2f2;">
+                        <i class="bi bi-x-lg"></i>
+                    </button>
+                </form>
+
+            {% elif score.resume.status == 'HIRED' %}
+                 <span class="icon-btn" style="background:#dcfce7; color:#166534; border:none; cursor:default;">
+                    <i class="bi bi-trophy-fill"></i>
+                 </span>
+
+            {% else %}
+                {% if score.resume.status != 'AUTO_REJECTED' and score.resume.status != 'INTERVIEW_REJECTED' %}
+                    <button class="icon-btn" title="Schedule Interview" 
+                            onclick="openScheduleModal('{{ score.id }}', '{{ score.resume.candidate_name|escapejs }}', '{{ score.job.name|escapejs }}')">
+                        <i class="bi bi-calendar-event"></i>
+                    </button>
+                {% endif %}
+
+            {% endif %}
+            <form method="post" action="{% url 'score_rescore' score.id %}" style="display:inline;">
+                {% csrf_token %}
+                <button type="submit" class="icon-btn" title="Rescore">
+                    <i class="bi bi-arrow-clockwise"></i>
+                </button>
+            </form>
+
+            <label class="fav-wrapper" title="Mark as Favorite">
+                <input type="checkbox" class="fav-input" 
+                       data-resume-id="{{ score.resume.id }}" 
+                       data-field="is_favorite" 
+                       data-value="{% if score.resume.is_favorite %}false{% else %}true{% endif %}"
+                       {% if score.resume.is_favorite %}checked{% endif %} />
+                <div class="icon-btn fav-btn">
+                    <i class="bi {% if score.resume.is_favorite %}bi-star-fill{% else %}bi-star{% endif %}"></i>
+                </div>
+            </label>
+        </div>
+    </div>
+  </div>
+
+  <div class="meta-grid">
+    <div class="meta-item">
+        <i class="bi bi-envelope-at"></i>
+        <span>{{ score.resume.candidate_email|default:"--" }}</span>
+    </div>
+    <div class="meta-item">
+        <i class="bi bi-telephone"></i>
+        <span>{{ score.resume.candidate_phone|default:"--" }}</span>
+    </div>
+    <div class="meta-item">
+        <i class="bi bi-calendar3"></i>
+        <span>{{ score.resume.received_at|timezone:"Asia/Kolkata"|date:"M d, Y" }}</span>
+    </div>
+    <div class="meta-item">
+        <i class="bi bi-paperclip"></i>
+        <span class="truncate" title="{{ score.resume.attachment_name }}">{{ score.resume.attachment_name }}</span>
+    </div>
+  </div>
+
+  <details class="breakdown-details">
+    <summary>
+        <i class="bi bi-bar-chart-steps"></i> View Screening Breakdown
+    </summary>
+    <div class="table-container">
+        <table class="breakdown-table">
+            <thead>
+                <tr>
+                    <th style="width: 40%">Criteria</th>
+                    <th style="width: 15%">Score</th>
+                    <th>Notes</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for item in score.detail %}
+                <tr>
+                    <td class="criteria-name">{{ item.title }}</td>
+                    <td>
+                        <span class="table-score {% if item.score >= 75 %}high{% elif item.score < 40 %}low{% endif %}">
+                            {{ item.score }}
+                        </span>
+                    </td>
+                    <td class="criteria-notes">{{ item.notes|default:"-" }}</td>
+                </tr>
+                {% empty %}
+                <tr><td colspan="3" style="text-align:center; padding: 20px; color:#94a3b8;">No breakdown data available.</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+  </details>
+
+  <details class="text-details">
+    <summary>
+        <i class="bi bi-file-text"></i> View Resume Content
+    </summary>
+    <div class="resume-content">
+        {{ score.resume.text_content|default:"No text captured." }}
+    </div>
+  </details>
+
+</article>
+{% endfor %}
+
+<dialog id="scheduleModal" style="border:none; border-radius:12px; padding:0; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1); width: 400px; max-width:90vw;">
+    <div class="modal-header">
+        <h3>Schedule Interview</h3>
+        <p id="modalSub" style="margin:5px 0 0; font-size:0.85rem; color:#64748b;">Candidate Name</p>
+    </div>
+    
+    <form id="scheduleForm" method="post" style="padding: 20px; display: flex; flex-direction: column; gap: 15px;">
+        {% csrf_token %}
+        
+        <div>
+            <label>Date & Time</label>
+            <input type="datetime-local" name="interview_date" required>
+        </div>
+
+        <div>
+            <label>Meeting Link / Location</label>
+            <input type="text" name="interview_link" placeholder="e.g. Google Meet Link">
+        </div>
+
+        <div>
+            <label>Notes (Included in email)</label>
+            <textarea name="message_notes" rows="3" placeholder="Additional instructions..."></textarea>
+        </div>
+
+        <div class="modal-actions">
+            <button type="button" class="btn-cancel" onclick="document.getElementById('scheduleModal').close()">
+                Cancel
+            </button>
+            <button type="submit" class="btn-submit">
+                Send Invite
+            </button>
+        </div>
+    </form>
+</dialog>
+
+<script>
+function openScheduleModal(scoreId, name, job) {
+    const modal = document.getElementById('scheduleModal');
+    const form = document.getElementById('scheduleForm');
+    const sub = document.getElementById('modalSub');
+    
+    // Forces absolute path to fix 404 error
+    form.action = `/schedule/${scoreId}/`;
+    
+    // Update Subtext
+    sub.innerText = `For ${name} (${job})`;
+    
+    // Open Dialog
+    modal.showModal();
+}
+
+// Close modal if clicked outside
+const modal = document.getElementById('scheduleModal');
+modal.addEventListener('click', (event) => {
+    if (event.target === modal) {
+        modal.close();
+    }
+});
+</script>

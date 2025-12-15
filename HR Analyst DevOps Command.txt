@@ -1,0 +1,93 @@
+# Set your values
+$PROJECT_ID = "minfyhr"
+$REGION = "asia-south1"
+$SERVICE = "hr-analyst"
+$WORKER = "hr-analyst-worker"
+$REPO = "minfyhr"
+$DB_INSTANCE = "minfyhrdb"
+$DB_USER = "postgres"
+$DB_PASS = "Minfy@2025"
+$DB_NAME = "minfyhrdb"
+$BUCKET = "hrstrg"
+$VERTEX_MODEL = "gemini-2.5-pro"
+$VERTEX_LOCATION = "us-central1"
+
+gcloud config set project $PROJECT_ID
+
+# Enable APIs
+gcloud services enable run.googleapis.com sqladmin.googleapis.com artifactregistry.googleapis.com aiplatform.googleapis.com secretmanager.googleapis.com cloudbuild.googleapis.com
+
+# Create Cloud SQL Postgres
+#gcloud sql instances create $DB_INSTANCE --database-version=POSTGRES_15 --cpu=2 --memory=4GiB --region=$REGION
+#gcloud sql users create $DB_USER --instance=$DB_INSTANCE --password="$DB_PASS"
+#gcloud sql databases create $DB_NAME --instance=$DB_INSTANCE
+
+# Artifact Registry
+#gcloud artifacts repositories create $REPO --repository-format=docker --location=$REGION
+
+# Build & push image
+$IMAGE = "$REGION-docker.pkg.dev/$PROJECT_ID/$REPO/hr-analyst:latest"
+gcloud builds submit --tag $IMAGE .
+
+# Bucket for resumes
+gsutil mb -l $REGION gs://$BUCKET
+
+# Deploy web service
+$CLOUDSQL_CONN_NAME = "${PROJECT_ID}:${REGION}:${DB_INSTANCE}"# Deploy web service
+
+gcloud run deploy $SERVICE `
+  --image $IMAGE `
+  --region $REGION `
+  --platform managed `
+  --allow-unauthenticated `
+  --add-cloudsql-instances $CLOUDSQL_CONN_NAME `
+  --set-env-vars ("DJANGO_SETTINGS_MODULE=hr_analyst.settings,DEBUG=0,ALLOWED_HOSTS=*,POSTGRES_DB=$DB_NAME,POSTGRES_USER=$DB_USER,POSTGRES_PASSWORD=$DB_PASS,POSTGRES_HOST=/cloudsql/$CLOUDSQL_CONN_NAME,POSTGRES_PORT=5432,GCS_BUCKET_NAME=$BUCKET,VERTEX_PROJECT_ID=$PROJECT_ID,VERTEX_LOCATION=$VERTEX_LOCATION,VERTEX_MODEL=$VERTEX_MODEL") `
+  --max-instances=2
+
+# Run migrations (Cloud Run Job)
+gcloud run jobs create hr-analyst-migrate `
+  --image $IMAGE `
+  --region $REGION `
+  --command "python" --args "manage.py","migrate" `
+  --add-cloudsql-instances $CLOUDSQL_CONN_NAME `
+  --set-env-vars ("DJANGO_SETTINGS_MODULE=hr_analyst.settings,DEBUG=0,ALLOWED_HOSTS=*,POSTGRES_DB=$DB_NAME,POSTGRES_USER=$DB_USER,POSTGRES_PASSWORD=$DB_PASS,POSTGRES_HOST=/cloudsql/$CLOUDSQL_CONN_NAME,POSTGRES_PORT=5432,GCS_BUCKET_NAME=$BUCKET,VERTEX_PROJECT_ID=$PROJECT_ID,VERTEX_LOCATION=$VERTEX_LOCATION,VERTEX_MODEL=$VERTEX_MODEL")
+
+gcloud run jobs execute hr-analyst-migrate --region $REGION
+
+# Deploy worker (inbox poller)
+gcloud run deploy $WORKER `
+  --image $IMAGE `
+  --region $REGION `
+  --platform managed `
+  --allow-unauthenticated `
+  --add-cloudsql-instances $CLOUDSQL_CONN_NAME `
+  --set-env-vars ("DJANGO_SETTINGS_MODULE=hr_analyst.settings,DEBUG=0,ALLOWED_HOSTS=*,POSTGRES_DB=$DB_NAME,POSTGRES_USER=$DB_USER,POSTGRES_PASSWORD=$DB_PASS,POSTGRES_HOST=/cloudsql/$CLOUDSQL_CONN_NAME,POSTGRES_PORT=5432,GCS_BUCKET_NAME=$BUCKET,VERTEX_PROJECT_ID=$PROJECT_ID,VERTEX_LOCATION=$VERTEX_LOCATION,VERTEX_MODEL=$VERTEX_MODEL") `
+  --command "python" --args "manage.py","watch_inbox","--interval","300","--batch","50","--initial-full" `
+  --max-instances=1 --min-instances=0
+
+
+$IMAGE="$REGION-docker.pkg.dev/$PROJECT_ID/$REPO/hr-analyst:latest"
+gcloud builds submit --tag $IMAGE .
+
+
+gcloud run deploy $SERVICE --image $IMAGE --region $REGION --platform managed --allow-unauthenticated --add-cloudsql-instances $CLOUDSQL_CONN_NAME --set-env-vars "DJANGO_SETTINGS_MODULE=hr_analyst.settings,DEBUG=0,ALLOWED_HOSTS=*,POSTGRES_DB=$DB_NAME,POSTGRES_USER=$DB_USER,POSTGRES_PASSWORD=$DB_PASS,POSTGRES_HOST=/cloudsql/$CLOUDSQL_CONN_NAME,POSTGRES_PORT=5432,GCS_BUCKET_NAME=$BUCKET,VERTEX_PROJECT_ID=$PROJECT_ID,VERTEX_LOCATION=$VERTEX_LOCATION,VERTEX_MODEL=$VERTEX_MODEL" --max-instances=5
+gcloud run deploy $WORKER --image $IMAGE --region $REGION --platform managed --allow-unauthenticated --add-cloudsql-instances $CLOUDSQL_CONN_NAME --set-env-vars "DJANGO_SETTINGS_MODULE=hr_analyst.settings,DEBUG=0,ALLOWED_HOSTS=*,POSTGRES_DB=$DB_NAME,POSTGRES_USER=$DB_USER,POSTGRES_PASSWORD=$DB_PASS,POSTGRES_HOST=/cloudsql/$CLOUDSQL_CONN_NAME,POSTGRES_PORT=5432,GCS_BUCKET_NAME=$BUCKET,VERTEX_PROJECT_ID=$PROJECT_ID,VERTEX_LOCATION=$VERTEX_LOCATION,VERTEX_MODEL=$VERTEX_MODEL" --command "python" --args "manage.py","watch_inbox","--interval","300","--batch","50","--initial-full" --max-instances=1 --min-instances=0
+
+
+gcloud run jobs create hr-analyst-superuser `
+  --image $IMAGE `
+  --region $REGION `
+  --command "python" --args "manage.py","createsuperuser","--noinput" `
+  --set-cloudsql-instances $CLOUDSQL_CONN_NAME `
+  --set-env-vars ("DJANGO_SETTINGS_MODULE=hr_analyst.settings,DEBUG=0,ALLOWED_HOSTS=*,POSTGRES_DB=$DB_NAME,POSTGRES_USER=$DB_USER,POSTGRES_PASSWORD=$DB_PASS,POSTGRES_HOST=/cloudsql/$CLOUDSQL_CONN_NAME,POSTGRES_PORT=5432,GCS_BUCKET_NAME=$BUCKET,VERTEX_PROJECT_ID=$PROJECT_ID,VERTEX_LOCATION=$VERTEX_LOCATION,VERTEX_MODEL=$VERTEX_MODEL,DJANGO_SUPERUSER_USERNAME=hradmin,DJANGO_SUPERUSER_EMAIL=cxo@minfytech.com,DJANGO_SUPERUSER_PASSWORD=Minfy@2025")
+
+gcloud run jobs execute hr-analyst-superuser --region $REGION
+
+gcloud run jobs create hr-analyst-process `
+  --image $IMAGE `
+  --region $REGION `
+  --command "python" --args "manage.py","process_inbox","--limit","450" `
+  --set-cloudsql-instances $CLOUDSQL_CONN_NAME `
+  --set-env-vars ("DJANGO_SETTINGS_MODULE=hr_analyst.settings,DEBUG=0,ALLOWED_HOSTS=*,POSTGRES_DB=$DB_NAME,POSTGRES_USER=$DB_USER,POSTGRES_PASSWORD=$DB_PASS,POSTGRES_HOST=/cloudsql/$CLOUDSQL_CONN_NAME,POSTGRES_PORT=5432,GCS_BUCKET_NAME=$BUCKET,VERTEX_PROJECT_ID=$PROJECT_ID,VERTEX_LOCATION=$VERTEX_LOCATION,VERTEX_MODEL=$VERTEX_MODEL,DJANGO_SUPERUSER_USERNAME=hradmin,DJANGO_SUPERUSER_EMAIL=cxo@minfytech.com,DJANGO_SUPERUSER_PASSWORD=Minfy@2025")
+
+gcloud run jobs execute hr-analyst-process --region $REGION

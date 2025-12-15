@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+{% block content %}
+<h2 style="margin-bottom:.25rem;">{{ title }}</h2>
+<p class="muted" style="margin-top:0; margin-bottom:.75rem;">Add rich text criteria; one block per requirement.</p>
+<form method="post">
+    {% csrf_token %}
+    <fieldset>
+        {{ form.non_field_errors }}
+        <label>Name {{ form.name }}</label>
+        <label>Summary (rich text)
+            {{ form.summary }}
+        </label>
+        <label>{{ form.active }} Active</label>
+    </fieldset>
+    <fieldset>
+        <legend>Qualification Criteria (rich text, include scoring conditions)</legend>
+        {{ formset.management_form }}
+        {% for form in formset %}
+            <article class="card">
+                {{ form.id }}
+                <label>Detail (all scoring/conditions) {{ form.detail }}</label>
+                {% if form.instance.pk %}
+                    <label>{{ form.DELETE }} Delete</label>
+                {% endif %}
+            </article>
+        {% endfor %}
+    </fieldset>
+    <button type="submit">Save</button>
+</form>
+{% endblock %}

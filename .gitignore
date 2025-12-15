@@ -1,0 +1,66 @@
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+env/
+venv/
+.venv/
+env.bak/
+.env
+.env.example
+.DS_Store
+staticfiles/
+db.sqlite3
+build/
+dist/
+*.egg-info/
+.pytest_cache/
+pgdata/
+*.json
+media/
+docker-compose.dev.yml
+
+
+
+
+# --- Python ---
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.egg-info/
+build/
+dist/
+
+# --- Environments ---
+env/
+venv/
+.venv/
+env.bak/
+
+# --- Security (CRITICAL) ---
+.env
+credentials.json
+minfyhr-*.json
+
+# --- OS Files ---
+.DS_Store
+
+# --- Django/Database ---
+db.sqlite3
+staticfiles/
+
+# --- User Uploads (Resumes) ---
+media/
+
+# --- Docker Data ---
+pgdata/
+
+# --- Testing ---
+.pytest_cache/
+
+# --- IDEs (Optional) ---
+.vscode/
+.idea/

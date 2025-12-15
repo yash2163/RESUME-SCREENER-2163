@@ -1,0 +1,100 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="card">
+    <h2 style="margin:0 0 .25rem;">Upload resumes</h2>
+    <p class="muted" style="margin:0 0 .5rem;">Send one or many resumes to be scored against an active JD. Uploaded resumes will show on the dashboard with source "Upload".</p>
+    <form method="post" enctype="multipart/form-data" id="upload-form">
+        {% csrf_token %}
+        <label>
+            {{ form.job.label_tag }}
+            {{ form.job }}
+            <small class="muted">{{ form.job.help_text }}</small>
+            {% if form.job.errors %}<small role="alert">{{ form.job.errors }}</small>{% endif %}
+        </label>
+        <label>
+            {{ form.use_folder }} {{ form.use_folder.label_tag }}
+            <small class="muted">{{ form.use_folder.help_text }}</small>
+        </label>
+        <label>
+            {{ form.files.label_tag }}
+            {{ form.files }}
+            <small class="muted">{{ form.files.help_text }}</small>
+            {% if form.files.errors %}<small role="alert">{{ form.files.errors }}</small>{% endif %}
+        </label>
+        <button type="submit" style="margin-top:.5rem;">Upload and score</button>
+    </form>
+    {% if ingest_result is not None %}
+        <p style="margin-top:.75rem;">Processed {{ ingest_result }} file(s).</p>
+    {% endif %}
+</section>
+<script>
+document.addEventListener("DOMContentLoaded", () => {
+    const checkbox = document.querySelector("input[name=use_folder]");
+    const fileInput = document.querySelector("input[type=file][name=files]");
+    const form = document.getElementById("upload-form");
+    const csrf = form?.querySelector("input[name=csrfmiddlewaretoken]");
+    const statusBox = document.createElement("p");
+    statusBox.className = "muted";
+    statusBox.style.marginTop = ".5rem";
+    form?.appendChild(statusBox);
+
+    const toggleFolderAttr = () => {
+        if (!fileInput) return;
+        if (checkbox && checkbox.checked) {
+            fileInput.setAttribute("webkitdirectory", "true");
+            fileInput.setAttribute("mozdirectory", "true");
+            fileInput.setAttribute("directory", "true");
+        } else {
+            fileInput.removeAttribute("webkitdirectory");
+            fileInput.removeAttribute("mozdirectory");
+            fileInput.removeAttribute("directory");
+        }
+    };
+    checkbox?.addEventListener("change", toggleFolderAttr);
+    toggleFolderAttr();
+
+    form?.addEventListener("submit", async (event) => {
+        event.preventDefault();
+        if (!fileInput || !fileInput.files.length) {
+            statusBox.textContent = "No file selected.";
+            statusBox.style.color = "#b00020";
+            return;
+        }
+        statusBox.textContent = "Uploading...";
+        statusBox.style.color = "";
+        const formData = new FormData(form);
+        const jobField = form.querySelector("select[name=job]");
+        if (jobField) {
+            formData.set("job", jobField.value);
+        }
+        try {
+            const resp = await fetch(form.action || window.location.href, {
+                method: "POST",
+                headers: { "X-Requested-With": "XMLHttpRequest" },
+                body: formData,
+            });
+            const text = await resp.text();
+            let data = null;
+            try {
+                data = JSON.parse(text);
+            } catch (parseErr) {
+                throw new Error(text || "Upload failed (non-JSON response)");
+            }
+            if (!resp.ok || !data?.success) {
+                throw new Error((data && data.message) || "Upload failed");
+            }
+            statusBox.textContent = data.message || "Uploaded.";
+            statusBox.style.color = "#065f46";
+            if (data.cards_html || data.rows_html) {
+                localStorage.setItem("upload_results", JSON.stringify(data));
+            }
+            form.reset();
+            toggleFolderAttr();
+        } catch (err) {
+            statusBox.textContent = err.message || "Upload failed.";
+            statusBox.style.color = "#b00020";
+        }
+    });
+});
+</script>
+{% endblock %}

@@ -1,0 +1,51 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="filters-bar" style="align-items:center; justify-content:space-between;">
+    <div>
+        <h2 style="margin:0;">Job Descriptions</h2>
+        <p class="muted" style="margin:0;">Manage qualification criteria</p>
+    </div>
+    <div>
+        <a role="button" href="{% url 'job_create' %}">New JD</a>
+    </div>
+</div>
+{% for job in jobs %}
+    <article class="card">
+        <header class="grid">
+            <div>
+                <h4>{{ job.name }}</h4>
+            </div>
+            <div style="text-align:right;">
+                <span class="badge {% if job.active %}success{% else %}muted{% endif %}">
+                    {{ job.active|yesno:"Active,Inactive" }}
+                </span>
+                <div style="margin-top:.5rem;">
+                    <a href="{% url 'job_edit' job.pk %}">Edit</a>
+                    <form method="post" action="{% url 'job_toggle' job.pk %}" style="display:inline;">
+                        {% csrf_token %}
+                        <button type="submit" class="secondary">Toggle</button>
+                    </form>
+                    <form method="post" action="{% url 'job_rescore' job.pk %}" style="display:inline;">
+                        {% csrf_token %}
+                        <button type="submit">Rescore</button>
+                    </form>
+                </div>
+            </div>
+        </header>
+        <div>
+            <strong>Qualification Criteria</strong>
+            <div style="max-height:200px; overflow:auto; border:1px solid #eee; padding:.5rem; border-radius:6px;">
+                <ul>
+                    {% for c in job.criteria.all %}
+                        <li>{{ c.detail|linebreaksbr }}</li>
+                    {% empty %}
+                        <li>No criteria yet.</li>
+                    {% endfor %}
+                </ul>
+            </div>
+        </div>
+    </article>
+{% empty %}
+    <p>No job descriptions yet.</p>
+{% endfor %}
+{% endblock %}

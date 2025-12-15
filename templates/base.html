@@ -1,0 +1,1401 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>HR Analyst</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <link
+      rel="stylesheet"
+      href="https://cdn.jsdelivr.net/npm/@picocss/pico@1.5.11/css/pico.min.css"
+    />
+
+
+
+
+
+
+
+
+
+
+
+
+    <style>
+      :root {
+        --accent: #2563eb;
+        --accent-light: #3b82f6;
+        --accent-dark: #1d4ed8;
+        --success: #10b981;
+        --warning: #f59e0b;
+        --danger: #ef4444;
+        --gray-50: #f9fafb;
+        --gray-100: #f3f4f6;
+        --gray-200: #e5e7eb;
+        --gray-300: #d1d5db;
+        --gray-400: #9ca3af;
+        --gray-500: #6b7280;
+        --gray-600: #4b5563;
+        --gray-700: #374151;
+        --gray-800: #1f2937;
+        --gray-900: #111827;
+        --border-color: #e5e7eb;
+        --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+        --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+        --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+        --transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+      }
+
+      * {
+        transition: var(--transition);
+      }
+
+      body {
+        padding: 0;
+        font-family: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
+        background: linear-gradient(135deg, #f9fafb 0%, #f3f4f6 100%);
+        color: var(--gray-800);
+      }
+
+      main.container {
+        /* background-color: red; */
+        max-width: 1200px;
+        padding: 2rem 1.5rem 2.5rem;
+      }
+
+      /* header {
+        margin-bottom: 2rem;
+      } */
+
+      nav {
+        /* background: blue; */
+        border-bottom: 2px solid var(--border-color);
+        border-radius: 12px;
+        padding: 0.8rem 1.2rem;
+        margin-bottom: 2rem;
+        box-shadow: var(--shadow-sm);
+      }
+
+      nav ul {
+        gap: 1rem;
+        align-items: center;
+      }
+
+      nav li:first-child strong {
+        font-size: 1.25rem;
+        background: linear-gradient(
+          135deg,
+          var(--accent) 0%,
+          var(--accent-light) 100%
+        );
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        background-clip: text;
+        font-weight: 700;
+        letter-spacing: -0.02em;
+      }
+
+      nav a {
+        font-size: 0.95rem;
+        font-weight: 500;
+        color: var(--gray-600);
+        text-decoration: none;
+        padding: 0.5rem 1rem;
+        border-radius: 8px;
+        position: relative;
+        overflow: hidden;
+      }
+
+      nav a::before {
+        content: "";
+        position: absolute;
+        bottom: 0;
+        left: 0;
+        width: 100%;
+        height: 2px;
+        background: var(--accent);
+        transform: scaleX(0);
+        transform-origin: right;
+        transition: transform 0.3s ease;
+      }
+
+      nav a:hover {
+        color: var(--accent);
+        background: rgba(37, 99, 235, 0.05);
+      }
+
+      nav a:hover::before {
+        transform: scaleX(1);
+        transform-origin: left;
+      }
+
+      nav li:last-child {
+        margin-left: auto;
+        display: flex;
+        gap: 0.5rem;
+        align-items: center;
+      }
+
+      nav li:nth-last-child(2) {
+        color: var(--gray-600);
+        font-weight: 500;
+        font-size: 0.95rem;
+      }
+
+      h1,
+      h2,
+      h3,
+      h4 {
+        margin: 0 0 0.3rem;
+        letter-spacing: -0.02em;
+        color: var(--gray-900);
+      }
+
+      h1 {
+        font-size: 2rem;
+        font-weight: 700;
+      }
+
+      h2 {
+        font-size: 1.5rem;
+        font-weight: 700;
+      }
+
+      h3 {
+        font-size: 1.1rem;
+        font-weight: 600;
+      }
+
+      .badge {
+        display: inline-block;
+        padding: 0.25rem 0.75rem;
+        border-radius: 999px;
+        font-size: 0.75rem;
+        font-weight: 600;
+        letter-spacing: 0.5px;
+      }
+
+      .badge.success {
+        background: rgba(16, 185, 129, 0.1);
+        color: var(--success);
+      }
+
+      .badge.muted {
+        background: var(--gray-100);
+        color: var(--gray-600);
+      }
+
+      .card {
+        border: 1px solid var(--border-color);
+        border-radius: 10px;
+        padding: 1.25rem;
+        margin-bottom: 1rem;
+        box-shadow: var(--shadow-sm);
+        background: #ad0a0a;
+        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+      }
+
+      .card:hover {
+        box-shadow: var(--shadow-md);
+        border-color: rgba(37, 99, 235, 0.15);
+        transform: translateY(-1px);
+      }
+
+      .score {
+        font-weight: 700;
+        font-size: 1.1rem;
+      }
+
+      .rich-text {
+        min-height: 140px;
+        overflow: auto;
+        font-size: 0.95rem;
+        line-height: 1.6;
+      }
+
+      .score-high {
+        color: var(--success);
+        font-weight: 600;
+      }
+
+      .score-low {
+        color: var(--danger);
+        font-weight: 600;
+      }
+
+      .view-toggle {
+        display: flex;
+        gap: 0.5rem;
+        align-items: center;
+        justify-content: flex-end;
+      }
+
+      label {
+        font-size: 0.95rem;
+        font-weight: 500;
+        color: var(--gray-700);
+      }
+
+      select,
+      input,
+      textarea {
+        font-size: 0.75rem;
+        border-radius: 8px;
+        border: 1.5px solid var(--border-color);
+        /* padding: 0.65rem 0.75rem; */
+        padding: 1rem;
+        transition: all 0.3s ease;
+        background: #faf7f7;
+        color: var(--gray-900);
+      }
+
+      select:focus,
+      input:focus,
+      textarea:focus {
+        border-color: var(--accent);
+        box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+        outline: none;
+      }
+
+      select:hover,
+      input:hover,
+      textarea:hover {
+        border-color: var(--accent-light);
+      }
+
+      /* .dashboard-header {
+        width: 100%;
+        font-size: 50px;
+        background-color: red;
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 1.5rem;
+      } */
+
+      .button-group {
+        width: 500px;
+        display: flex;
+        flex-direction: row;
+        /* align-items: center; */
+        justify-content: space-between;
+        gap: 15px;
+      }
+
+      button,
+      a[role="button"] {
+        font-size: 0.92rem;
+        width: 100%;
+        font-weight: 600;
+        border-radius: 8px;
+        /* padding: 0.65rem 1.25rem; */
+        background: var(--accent);
+        border: none;
+        color: #fff;
+        cursor: pointer;
+        transition: all 0.3s ease;
+        box-shadow: 0 2px 8px rgba(37, 99, 235, 0.2);
+        text-decoration: none;
+        /* display: block; */
+      }
+
+      button:hover,
+      a[role="button"]:hover {
+        background: var(--accent-light);
+        box-shadow: 0 4px 12px rgba(37, 99, 235, 0.3);
+        transform: translateY(-2px);
+      }
+
+      button:active,
+      a[role="button"]:active {
+        transform: translateY(0);
+        box-shadow: 0 1px 4px rgba(37, 99, 235, 0.2);
+      }
+
+      /* button.secondary,
+      a.secondary {
+        background: var(--gray-200);
+        color: var(--gray-800);
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+      }
+
+      button.secondary:hover,
+      a.secondary:hover {
+        background: var(--gray-300);
+        box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
+      } */
+
+      .secondary,.fav-checkbox-wrapper{
+        background-color: black;
+        padding: 20px
+      }
+
+      table {
+        width: 100%;
+        border-collapse: collapse;
+      }
+
+      table th,
+      table td {
+        font-size: 0.9rem;
+        padding: 0.75rem 1rem;
+        text-align: left;
+      }
+
+      table th {
+        background: var(--gray-100);
+        font-weight: 600;
+        color: var(--gray-700);
+        border-bottom: 2px solid var(--border-color);
+      }
+
+      table td {
+        border-bottom: 1px solid var(--border-color);
+      }
+
+      table tbody tr {
+        transition: all 0.2s ease;
+      }
+
+      table tbody tr:hover {
+        background: var(--gray-50);
+      }
+
+      details summary {
+        cursor: pointer;
+        font-weight: 600;
+        color: var(--gray-800);
+        padding: 0.5rem 0;
+        user-select: none;
+      }
+
+      .action-buttons-section{
+
+        display: flex;
+        flex-direction: row;
+        background-color: green;
+      }
+
+      details summary:hover {
+        color: var(--accent);
+      }
+
+      .dashboard-filter-form {
+        display: flex;
+        gap: 1rem;
+        flex-wrap: wrap;
+        align-items: center;
+      }
+
+      .filters-bar {
+        display: flex;
+        flex-direction: column;
+        text-align: center;
+        gap: 1.5rem;
+        align-items: center;
+        flex-wrap: wrap;
+        padding: 1.5rem;
+        border: 1px solid var(--border-color);
+        border-radius: 10px;
+        background: #62650e;
+        box-shadow: var(--shadow-sm);
+        margin-bottom: 2rem;
+      }
+
+      .filters-bar > div:first-child {
+        flex: 1;
+        min-width: 200px;
+      }
+
+      .filters-bar > div:first-child h2 {
+        margin-bottom: 0.25rem;
+      }
+
+      .filters-bar label {
+        margin: 0;
+        min-width: 180px;
+        font-weight: 500;
+      }
+
+      .filters-bar form {
+        display: flex;
+        gap: 1rem;
+        flex-wrap: wrap;
+        align-items: flex-end;
+        flex: 1;
+        min-width: 200px;
+      }
+
+      .muted {
+        color: var(--gray-500);
+      }
+
+      .grid-cards {
+        display: grid;
+        grid-template-columns: 1fr;
+        gap: 1rem;
+      }
+
+      .resume-text {
+        white-space: pre-wrap;
+        font-size: 0.9rem;
+        line-height: 1.6;
+        max-height: 250px;
+        overflow: auto;
+        background: var(--gray-50);
+        padding: 0.75rem;
+        border-radius: 8px;
+        border: 1px solid var(--border-color);
+        color: var(--gray-700);
+      }
+
+      div[role="alert"],
+      p[role="alert"] {
+        padding: 1rem 1.25rem;
+        border-radius: 10px;
+        margin-bottom: 1rem;
+        background: rgba(16, 185, 129, 0.1);
+        color: var(--success);
+        border-left: 4px solid var(--success);
+        font-weight: 500;
+      }
+
+      @media (max-width: 960px) {
+        main.container {
+          padding: 1.25rem;
+        }
+
+        nav {
+          padding: 0.75rem;
+          border-radius: 10px;
+        }
+
+        nav ul {
+          gap: 0.5rem;
+        }
+
+        nav a {
+          padding: 0.4rem 0.6rem;
+          font-size: 0.85rem;
+        }
+
+        .filters-bar {
+          flex-direction: column;
+          align-items: stretch;
+          padding: 1rem;
+        }
+
+        .filters-bar label {
+          min-width: 100%;
+        }
+
+        .filters-bar > div:first-child {
+          min-width: 100%;
+        }
+
+        .filters-bar form {
+          flex-direction: column;
+          width: 100%;
+          min-width: 100%;
+        }
+
+        .filters-bar form label,
+        .filters-bar form input,
+        .filters-bar form select,
+        .filters-bar form button,
+        .filters-bar form a {
+          width: 100%;
+        }
+
+        h1 {
+          font-size: 1.5rem;
+        }
+
+        h2 {
+          font-size: 1.25rem;
+        }
+      }
+
+      @media (max-width: 640px) {
+        main.container {
+          padding: 1rem;
+        }
+
+        nav li:last-child {
+          flex-direction: column;
+          align-items: flex-start;
+          width: 100%;
+          margin-left: 0;
+        }
+
+        nav {
+          padding: 0.6rem;
+        }
+      }
+
+      /* new css */
+
+      /* 1. Container & Layout */
+      .filters-bar {
+        background-color: #ffffff;
+        border: 1px solid #e2e8f0;
+        border-radius: 8px;
+        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
+        padding: 24px;
+        font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI",
+          Roboto, sans-serif;
+        color: #1e293b;
+        margin-bottom: 24px;
+      }
+
+      /* 2. Header Section */
+      .dashboard-header {
+        margin-bottom: 24px;
+        border-bottom: 1px solid #f1f5f9;
+        padding-bottom: 16px;
+      }
+
+      .dashboard-header h2 {
+        margin: 0;
+        font-size: 2rem;
+        font-weight: 700;
+        color: #0f172a;
+      }
+
+      .dashboard-header .muted {
+        margin: 4px 0 0 0;
+        color: #64748b;
+        font-size: 0.875rem;
+      }
+
+      /* 3. Form Layout */
+      #dashboard-filter-form {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: flex-end; /* Aligns inputs and buttons to the bottom */
+        gap: 20px;
+      }
+
+      /* 4. Filter Groups */
+      .filter-group {
+        display: flex;
+        flex-direction: column;
+        /* padding: 4px; */
+        gap: 8px;
+      }
+
+      .filter-group.search-group {
+        flex-grow: 1; /* Search bar fills available space */
+        min-width: 200px;
+      }
+
+      /* This works on all browsers */
+      .filter-group select {
+        font-size: medium;
+      }
+
+      .label-text {
+        font-size: 0.75rem;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        font-weight: 600;
+        color: #64748b;
+      }
+
+      /* 5. Inputs & Selects */
+      select,
+      input[type="text"] {
+        appearance: none;
+        background-color: #fff;
+        border: 1px solid #cbd5e1;
+        border-radius: 6px;
+        padding: 10px 14px;
+        font-size: 0.95rem;
+        color: #334155;
+        min-width: 140px;
+        height: 42px; /* Fixed height for alignment */
+        transition: all 0.2s ease;
+        background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%236b7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e");
+        background-position: right 0.5rem center;
+        background-repeat: no-repeat;
+        background-size: 1.5em 1.5em;
+        padding-right: 2.5rem;
+      }
+
+      /* Remove chevron from text input */
+      input[type="text"] {
+        background-image: none;
+        padding-right: 14px;
+      }
+
+      select:focus,
+      input[type="text"]:focus {
+        outline: none;
+        border-color: #3b82f6;
+        box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+      }
+
+      /* 6. Toggle Switch */
+      .switch {
+        position: relative;
+        /* display: inline-block; */
+        width: 14px;
+        height: 24px;
+        margin-top: 9px; /* Align visually with inputs */
+      }
+
+      .switch input {
+        opacity: 0;
+        width: 0;
+        height: 0;
+      }
+
+      .slider {
+        position: absolute;
+        cursor: pointer;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background-color: #cbd5e1;
+        transition: 0.4s;
+        border-radius: 34px;
+      }
+
+      .slider:before {
+        position: absolute;
+        content: "";
+        height: 18px;
+        width: 18px;
+        left: 3px;
+        bottom: 3px;
+        background-color: white;
+        transition: 0.4s;
+        border-radius: 50%;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+      }
+
+      input:checked + .slider {
+        background-color: #3b82f6; /* Accent Blue */
+      }
+
+      input:checked + .slider:before {
+        transform: translateX(150px);
+      }
+
+      /* 7. Buttons */
+      .button-group {
+        display: flex;
+        gap: 12px;
+        margin-left: auto; /* Pushes buttons to the far right if space allows */
+      }
+
+      .btn-primary {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        background-color: #0f172a; /* Dark Slate */
+        color: white;
+        font-weight: 500;
+        font-size: 0.95rem;
+        padding: 0 20px;
+        height: 42px;
+        border-radius: 6px;
+        border: none;
+        cursor: pointer;
+        text-decoration: none;
+        transition: background-color 0.2s ease;
+      }
+
+      .btn-primary:hover {
+        background-color: #334155;
+      }
+
+      /* Responsive adjustments */
+      @media (max-width: 768px) {
+        #dashboard-filter-form {
+          flex-direction: column;
+          align-items: stretch;
+        }
+
+        .button-group {
+          margin-left: 0;
+          flex-direction: column;
+        }
+
+        .filter-group.search-group {
+          width: 100%;
+        }
+
+        select,
+        input[type="text"],
+        .btn-primary {
+          width: 100%;
+        }
+      }
+      .btn-div {
+        display: flex;
+        flex-direction: row;
+        width: 100%;
+      }
+
+
+
+
+      /* =========================================
+      Score-CARD CONTAINER
+      ========================================= */
+    .card {
+        background: #ffffff;
+        border: 1px solid #e2e8f0;
+        border-radius: 12px; /* Softer corners */
+        padding: 24px;
+        margin-bottom: 24px;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.02);
+        transition: all 0.2s ease;
+        font-family: 'Inter', sans-serif;
+    }
+
+    .card:hover {
+        box-shadow: 0 12px 24px -6px rgba(0, 0, 0, 0.08);
+        transform: translateY(-2px);
+        border-color: #cbd5e1;
+    }
+
+    /* =========================================
+      1. HEADER SECTION
+      ========================================= */
+    .score-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        gap: 20px;
+        padding-bottom: 20px;
+        border-bottom: 1px solid #f1f5f9;
+        margin-bottom: 16px;
+    }
+
+    /* Left Side: Name & Job */
+    .header-left {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+    }
+
+    .candidate-name {
+        margin: 0;
+        font-size: 1.4rem;
+        font-weight: 700;
+        color: #1e293b;
+        letter-spacing: -0.01em;
+    }
+
+    .job-role {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        background: #f0f9ff; /* Light Blue bg */
+        color: #0369a1;      /* Dark Blue text */
+        padding: 4px 10px;
+        border-radius: 6px;
+        font-size: 0.85rem;
+        font-weight: 600;
+        width: fit-content;
+    }
+
+    /* Right Side: Score & Actions */
+    .header-right {
+        display: flex;
+        flex-direction: column;
+        align-items: flex-end;
+        gap: 12px;
+    }
+
+    /* Score Bubble */
+    .score-pill {
+        background: #f1f5f9;
+        padding: 6px 16px;
+        border-radius: 99px;
+        display: flex;
+        align-items: baseline;
+        gap: 4px;
+    }
+    .score-pill.score-success { background: #dcfce7; color: #166534; }
+    .score-pill.score-danger { background: #fee2e2; color: #991b1b; }
+
+    .score-value { font-size: 1.4rem; font-weight: 800; line-height: 1; }
+    .score-label { font-size: 0.8rem; opacity: 0.7; font-weight: 500; }
+
+    /* Action Buttons Row */
+    .action-row {
+        display: flex;
+        gap: 8px;
+    }
+
+    .icon-btn {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 38px;
+        height: 38px;
+        border: 1px solid #e2e8f0;
+        border-radius: 8px;
+        background: white;
+        color: #64748b;
+        font-size: 1.1rem;
+        cursor: pointer;
+        transition: all 0.2s;
+        text-decoration: none;
+        padding: 0; /* Reset button padding */
+    }
+
+    .icon-btn:hover {
+        background: #f8fafc;
+        border-color: #94a3b8;
+        color: #0f172a;
+        transform: translateY(-1px);
+    }
+
+    /* Fav Logic */
+    .fav-wrapper { position: relative; display: inline-block; }
+    .fav-input { position: absolute; opacity: 0; width: 0; height: 0; }
+    .fav-input:checked + .fav-btn { border-color: #fbbf24; background: #fffbeb; }
+    .fav-input:checked + .fav-btn i { color: #d97706; }
+
+    /* =========================================
+      2. METADATA GRID
+      ========================================= */
+    .meta-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 12px 24px;
+        margin-bottom: 20px;
+    }
+
+    .meta-item {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        color: #475569;
+        font-size: 0.92rem;
+    }
+
+    .meta-item i { color: #94a3b8; font-size: 1.1rem; }
+    .truncate {
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        max-width: 100%;
+    }
+
+    /* =========================================
+      3. DETAILS & TABLES
+      ========================================= */
+    details {
+        background: #f8fafc;
+        border: 1px solid #e2e8f0;
+        border-radius: 8px;
+        margin-top: 10px;
+        overflow: hidden;
+    }
+
+    details summary {
+        padding: 12px 16px;
+        font-weight: 600;
+        font-size: 0.9rem;
+        color: #334155;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        transition: background 0.2s;
+        list-style: none; /* Hide default triangle */
+    }
+    /* Custom Arrow */
+    details summary::after {
+        content: ''; 
+        margin-left: auto; 
+        font-size: 1.2em; 
+        font-weight: 400;
+    }
+    details[open] summary::after { content: ''; }
+
+    details summary:hover { background: #f1f5f9; color: #0f172a; }
+
+    /* Table Styling */
+    .table-container {
+        padding: 0;
+        border-top: 1px solid #e2e8f0;
+        background: white;
+    }
+
+    .breakdown-table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 0.9rem;
+    }
+
+    .breakdown-table th {
+        text-align: left;
+        background: #f8fafc;
+        padding: 12px 16px;
+        font-weight: 600;
+        color: #64748b;
+        border-bottom: 1px solid #e2e8f0;
+        font-size: 0.8rem;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+    }
+
+    .breakdown-table td {
+        padding: 12px 16px;
+        border-bottom: 1px solid #f1f5f9;
+        color: #334155;
+        vertical-align: top;
+    }
+
+    .breakdown-table tr:last-child td { border-bottom: none; }
+
+    .table-score {
+        font-weight: 700;
+        display: inline-block;
+        min-width: 30px;
+    }
+    .table-score.high { color: #166534; }
+    .table-score.low { color: #991b1b; }
+
+    .criteria-notes {
+        color: #64748b;
+        font-size: 0.85rem;
+        line-height: 1.5;
+    }
+
+    /* Resume Content Box */
+    .resume-content {
+        padding: 20px;
+        font-family: 'Menlo', 'Monaco', 'Courier New', monospace;
+        font-size: 0.85rem;
+        line-height: 1.6;
+        color: #334155;
+        white-space: pre-wrap;
+        max-height: 300px;
+        overflow-y: auto;
+        background: white;
+        border-top: 1px solid #e2e8f0;
+    }
+
+    /* Mobile Responsive */
+    @media (max-width: 768px) {
+        .score-header { flex-direction: column; gap: 16px; }
+        .header-right { width: 100%; flex-direction: row; justify-content: space-between; align-items: center; }
+        .meta-grid { grid-template-columns: 1fr; gap: 10px; }
+    }
+
+
+
+
+    /* =========================================
+      NEW: STATUS LABELS & MODAL
+      ========================================= */
+
+    /* 1. Status Tags (Interview / Rejected) */
+    .status-tag {
+        font-size: 0.75rem;
+        padding: 2px 8px;
+        border-radius: 4px;
+        margin-left: 8px;
+        font-weight: 600;
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+    }
+
+    .status-tag.interview {
+        background: #e0f2fe;
+        color: #0369a1;
+        border: 1px solid #bae6fd;
+    }
+
+    .status-tag.rejected {
+        background: #fee2e2;
+        color: #991b1b;
+        border: 1px solid #fecaca;
+    }
+
+    /* 2. Modal Styling */
+    dialog#scheduleModal {
+        border: none;
+        border-radius: 12px;
+        padding: 0;
+        box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+        width: 450px;
+        max-width: 90vw;
+        background: #ffffff;
+        overflow: hidden; /* Keeps header/footer contained */
+    }
+
+    /* The dark background behind the modal */
+    dialog#scheduleModal::backdrop {
+        background: rgba(15, 23, 42, 0.4); /* Dark slate tint */
+        backdrop-filter: blur(2px);        /* Blur effect */
+    }
+
+    /* Modal Header */
+    .modal-header {
+        padding: 20px;
+        border-bottom: 1px solid #e2e8f0;
+        background: #f8fafc;
+    }
+
+    .modal-header h3 {
+        margin: 0;
+        font-size: 1.1rem;
+        color: #0f172a;
+        font-weight: 700;
+    }
+
+    /* 3. Form Inputs inside Modal */
+    #scheduleForm input,
+    #scheduleForm textarea {
+        width: 100%;
+        padding: 10px 12px;
+        border: 1px solid #cbd5e1;
+        border-radius: 6px;
+        font-family: inherit;
+        font-size: 0.9rem;
+        transition: all 0.2s;
+        outline: none;
+        background: #fff;
+        box-sizing: border-box; /* Ensures padding doesn't break width */
+    }
+
+    #scheduleForm input:focus,
+    #scheduleForm textarea:focus {
+        border-color: #2563eb;
+        box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+    }
+
+    #scheduleForm label {
+        display: block;
+        font-size: 0.85rem;
+        font-weight: 600;
+        margin-bottom: 6px;
+        color: #334155;
+    }
+
+    /* 4. Modal Buttons */
+    .modal-actions {
+        display: flex;
+        justify-content: flex-end;
+        gap: 12px;
+        margin-top: 10px;
+    }
+
+    .btn-cancel {
+        background: white;
+        border: 1px solid #e2e8f0;
+        padding: 8px 16px;
+        border-radius: 6px;
+        cursor: pointer;
+        color: #64748b;
+        font-weight: 500;
+        transition: all 0.2s;
+    }
+
+    .btn-cancel:hover {
+        background: #f1f5f9;
+        color: #0f172a;
+    }
+
+    .btn-submit {
+        background: #0f172a;
+        color: white;
+        border: 1px solid #0f172a;
+        padding: 8px 16px;
+        border-radius: 6px;
+        cursor: pointer;
+        font-weight: 600;
+        transition: all 0.2s;
+    }
+
+    .btn-submit:hover {
+        background: #334155;
+        border-color: #334155;
+        transform: translateY(-1px);
+    }
+
+
+
+
+    /* =========================================
+      DASHBOARD TABS
+      ========================================= */
+    .dashboard-tabs {
+        display: flex;
+        gap: 24px;
+        margin-bottom: 20px;
+        border-bottom: 1px solid #e2e8f0;
+        padding-bottom: 0;
+    }
+
+    .tab-link {
+        text-decoration: none;
+        color: #64748b; /* Muted Slate */
+        font-weight: 500;
+        padding: 12px 4px;
+        border-bottom: 2px solid transparent;
+        transition: all 0.2s ease;
+        font-size: 0.95rem;
+    }
+
+    .tab-link:hover {
+        color: #0f172a;
+    }
+
+    .tab-link.active {
+        color: #2563eb; /* Primary Blue */
+        border-bottom-color: #2563eb;
+        font-weight: 600;
+    }
+
+
+
+
+
+
+
+
+
+
+
+
+    /* =========================================
+      SCORE TABLE ROWS
+    ========================================= */
+
+    /* 1. Base Row Styling */
+    .score-row td {
+        vertical-align: middle;
+        padding: 16px 12px;
+        border-bottom: 1px solid #f1f5f9;
+        color: #334155;
+        font-size: 0.95rem;
+    }
+
+    .score-row:hover {
+        background-color: #f8fafc;
+    }
+
+    /* 2. Typography & Links */
+    .job-name {
+        font-weight: 600;
+        color: #475569;
+        font-size: 0.9rem;
+        background: #f1f5f9;
+        padding: 4px 8px;
+        border-radius: 4px;
+        white-space: nowrap;
+    }
+
+    .score-row a {
+        color: #2563eb;
+        text-decoration: none;
+        font-weight: 500;
+        transition: color 0.2s;
+    }
+
+    .score-row a:hover {
+        color: #1d4ed8;
+        text-decoration: underline;
+    }
+
+    .candidate-info strong {
+        color: #0f172a;
+        font-size: 1rem;
+    }
+
+    /* 3. Status Badges (Table Version) */
+    .status-tag {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        padding: 4px 10px;
+        border-radius: 99px;
+        font-size: 0.75rem;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.02em;
+        white-space: nowrap;
+    }
+
+    .status-tag.interview {
+        background: #e0f2fe;
+        color: #0284c7;
+        border: 1px solid #bae6fd;
+    }
+
+    .status-tag.rejected {
+        background: #fee2e2;
+        color: #b91c1c;
+        border: 1px solid #fecaca;
+    }
+
+    .status-tag.hired {
+        background: #dcfce7;
+        color: #15803d;
+        border: 1px solid #bbf7d0;
+    }
+
+    /* 4. Score Pill */
+    .score-pill {
+        display: inline-block;
+        padding: 4px 12px;
+        border-radius: 99px;
+        font-weight: 700;
+        font-size: 0.9rem;
+        text-align: center;
+        min-width: 40px;
+    }
+
+    .score-success {
+        background-color: #dcfce7;
+        color: #166534;
+    }
+
+    .score-danger {
+        background-color: #fee2e2;
+        color: #991b1b;
+    }
+
+    /* 5. Action Buttons (Compact for Table) */
+    .action-row {
+        display: flex;
+        gap: 6px;
+        justify-content: flex-start;
+    }
+
+    .icon-btn {
+        width: 32px;
+        height: 32px;
+        border-radius: 6px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border: 1px solid #e2e8f0;
+        background: white;
+        color: #64748b;
+        cursor: pointer;
+        transition: all 0.2s;
+        padding: 0;
+    }
+
+    .icon-btn:hover {
+        background: #f1f5f9;
+        border-color: #cbd5e1;
+        color: #0f172a;
+        transform: translateY(-1px);
+    }
+
+    /* Specific Button Colors */
+    .icon-btn[title="Hire"]:hover {
+        background: #f0fdf4;
+        border-color: #bbf7d0;
+        color: #166534;
+    }
+
+    .icon-btn[title="Reject"]:hover {
+        background: #fef2f2;
+        border-color: #fecaca;
+        color: #991b1b;
+    }
+
+    /* 6. Criteria/Details Row (Hidden by default in basic table logic, styled if visible) */
+    .criteria-row td {
+        background-color: #f8fafc;
+        border-bottom: 2px solid #e2e8f0;
+        padding: 12px 24px;
+        font-size: 0.85rem;
+    }
+
+    .criteria-row ul {
+        list-style: none;
+        padding: 0;
+        margin: 0;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 12px;
+    }
+
+    .criteria-row li {
+        background: white;
+        padding: 4px 10px;
+        border: 1px solid #e2e8f0;
+        border-radius: 4px;
+        color: #475569;
+    }
+
+    </style>  
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  </head>
+  <body>
+    <main class="container">
+      <header>
+        <nav>
+          <ul>
+            <li><strong>HR Analyst</strong></li>
+            {% if user.is_authenticated %}
+            <li><a href="{% url 'dashboard' %}">Dashboard</a></li>
+            <li><a href="{% url 'job_list' %}">Job Descriptions</a></li>
+            <li><a href="{% url 'upload_resumes' %}">Uploads</a></li>
+            <li><a href="{% url 'error_log' %}">Error Log</a></li>
+            {% endif %}
+          </ul>
+          <ul>
+            {% if user.is_authenticated %}
+            <li>{{ user.username }}</li>
+            <li><a href="{% url 'logout' %}">Logout</a></li>
+            {% endif %}
+          </ul>
+        </nav>
+        {% if messages %}
+        <div>
+          {% for message in messages %}
+          <p role="alert">{{ message }}</p>
+          {% endfor %}
+        </div>
+        {% endif %}
+      </header>
+
+      {% block content %}{% endblock %}
+    </main>
+  </body>
+</html>

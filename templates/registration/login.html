@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+{% block content %}
+<section style="max-width: 420px; margin: 0 auto;">
+    <h3>Sign in</h3>
+    <form method="post" novalidate>
+        {% csrf_token %}
+        {{ form.non_field_errors }}
+        <label>
+            Username
+            {{ form.username }}
+        </label>
+        <label>
+            Password
+            {{ form.password }}
+        </label>
+        <label style="display:flex;align-items:center;gap:.5rem;">
+            {{ form.remember_me }} <span>Remember me</span>
+        </label>
+        <button type="submit">Login</button>
+    </form>
+</section>
+{% endblock %}
