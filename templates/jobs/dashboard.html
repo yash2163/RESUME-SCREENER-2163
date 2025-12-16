@@ -1,23 +1,19 @@
 {% extends "base.html" %}
+{% load static %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'jobs/styles/score_cards.css' %}">
+<link rel="stylesheet" href="{% static 'jobs/styles/score_rows.css' %}">
+{% endblock %}
 
 {% block content %}
 
 <div class="dashboard-tabs">
-    <a href="?tab=inbox" class="tab-link {% if current_tab == 'inbox' %}active{% endif %}">
-        Inbox
-    </a>
-    <a href="?tab=shortlisted" class="tab-link {% if current_tab == 'shortlisted' %}active{% endif %}">
-        Shortlisted
-    </a>
-    <a href="?tab=interviews" class="tab-link {% if current_tab == 'interviews' %}active{% endif %}">
-        Interviews
-    </a>
-    <a href="?tab=rejected" class="tab-link {% if current_tab == 'rejected' %}active{% endif %}">
-        Rejected
-    </a>
-    <a href="?tab=hired" class="tab-link {% if current_tab == 'hired' %}active{% endif %}">
-        Hired
-    </a>
+    <a href="?tab=inbox" class="tab-link {% if current_tab == 'inbox' %}active{% endif %}">Inbox</a>
+    <a href="?tab=shortlisted" class="tab-link {% if current_tab == 'shortlisted' %}active{% endif %}">Shortlisted</a>
+    <a href="?tab=interviews" class="tab-link {% if current_tab == 'interviews' %}active{% endif %}">Interviews</a>
+    <a href="?tab=rejected" class="tab-link {% if current_tab == 'rejected' %}active{% endif %}">Rejected</a>
+    <a href="?tab=hired" class="tab-link {% if current_tab == 'hired' %}active{% endif %}">Hired</a>
 </div>
 
 <div class="filters-bar">
@@ -52,8 +48,8 @@
             <select name="sort">
                 <option value="score_date" {% if sort == "score_date" %}selected{% endif %}>Score then Date</option>
                 <option value="date_score" {% if sort == "date_score" %}selected{% endif %}>Date then Score</option>
-                <option value="score_desc" {% if sort == "score_desc" %}selected{% endif %}>Score (high→low)</option>
-                <option value="score_asc" {% if sort == "score_asc" %}selected{% endif %}>Score (low→high)</option>
+                <option value="score_desc" {% if sort == "score_desc" %}selected{% endif %}>AI Score (high→low)</option>
+                <option value="score_asc" {% if sort == "score_asc" %}selected{% endif %}>AI Score (low→high)</option>
                 <option value="date_desc" {% if sort == "date_desc" %}selected{% endif %}>Newest first</option>
                 <option value="date_asc" {% if sort == "date_asc" %}selected{% endif %}>Oldest first</option>
                 <option value="human_desc" {% if sort == "human_desc" %}selected{% endif %}>Human Priority (high→low)</option>
@@ -178,6 +174,46 @@
     </form>
 </dialog>
 
+<dialog id="scheduleModal" style="border:none; border-radius:12px; padding:0; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1); width: 450px; max-width:90vw;">
+    <div class="modal-header" style="background:#f8fafc; padding:15px 20px; border-bottom:1px solid #e2e8f0;">
+        <h3 style="margin:0; font-size:1.1rem; color:#1e293b;">Schedule Interview</h3>
+        <p id="modalSub" style="margin:5px 0 0; font-size:0.85rem; color:#64748b;">Candidate Name</p>
+    </div>
+    
+    <form id="scheduleForm" method="post" style="padding: 20px; display: flex; flex-direction: column; gap: 15px;">
+        {% csrf_token %}
+        
+        <div>
+            <label style="display:block; font-size:0.9rem; font-weight:600; color:#475569; margin-bottom:5px;">Date & Time</label>
+            <input type="datetime-local" name="interview_date" required
+                   style="width:100%; padding:8px; border:1px solid #cbd5e1; border-radius:6px;">
+        </div>
+
+        <div>
+            <label style="display:block; font-size:0.9rem; font-weight:600; color:#475569; margin-bottom:5px;">Meeting Link / Location</label>
+            <input type="text" name="interview_link" placeholder="e.g. Google Meet Link or Office Address" required
+                   style="width:100%; padding:8px; border:1px solid #cbd5e1; border-radius:6px;">
+        </div>
+
+        <div>
+            <label style="display:block; font-size:0.9rem; font-weight:600; color:#475569; margin-bottom:5px;">Notes (Included in email)</label>
+            <textarea name="message_notes" rows="3" placeholder="Additional instructions for the candidate..."
+                      style="width:100%; padding:8px; border:1px solid #cbd5e1; border-radius:6px;"></textarea>
+        </div>
+
+        <div class="modal-actions" style="margin-top:10px; display:flex; justify-content:flex-end; gap:10px;">
+            <button type="button" class="btn-cancel" onclick="document.getElementById('scheduleModal').close()"
+                    style="padding:8px 16px; border:1px solid #cbd5e1; background:white; border-radius:6px; cursor:pointer;">
+                Cancel
+            </button>
+            <button type="submit" class="btn-submit"
+                    style="padding:8px 16px; border:none; background:#2563eb; color:white; border-radius:6px; cursor:pointer;">
+                Send Invite
+            </button>
+        </div>
+    </form>
+</dialog>
+
 <script>
 // ----------------------------------------
 // 1. GLOBAL FUNCTIONS (Accessible by onClick in HTML)
@@ -239,14 +275,12 @@ function openHumanRateModal(resumeId, name, criteriaList, existingScores) {
     modal.showModal();
 }
 
-// B. Shortlist Candidate Function (CRITICAL FIX: This was missing)
+// B. Shortlist Candidate Function
 async function shortlistCandidate(resumeId, btnElement) {
     if (!confirm("Move this candidate to Shortlisted?")) return;
 
     try {
-        // Save original content
         const originalContent = btnElement.innerHTML;
-        // Loading state
         btnElement.innerHTML = '<div class="loading-spinner" style="width:12px; height:12px;"></div>';
         btnElement.disabled = true;
 
@@ -261,7 +295,6 @@ async function shortlistCandidate(resumeId, btnElement) {
         });
 
         if (response.ok) {
-            // Success: Animate removal of card
             const card = btnElement.closest('.score-card') || btnElement.closest('.score-row');
             if (card) {
                 card.style.transition = "opacity 0.5s, transform 0.5s";
@@ -278,6 +311,23 @@ async function shortlistCandidate(resumeId, btnElement) {
         console.error('Error:', error);
         alert("Something went wrong.");
     }
+}
+
+// C. Open Schedule Modal Function
+function openScheduleModal(scoreId, name, job) {
+    const modal = document.getElementById('scheduleModal');
+    const form = document.getElementById('scheduleForm');
+    const sub = document.getElementById('modalSub');
+    
+    if (!modal || !form) {
+        console.error("Schedule modal or form not found in DOM.");
+        return;
+    }
+
+    form.action = `/schedule/${scoreId}/`;
+    if (sub) sub.innerText = `For ${name} (${job})`;
+    
+    modal.showModal();
 }
 
 // ----------------------------------------
@@ -323,13 +373,23 @@ document.addEventListener("DOMContentLoaded", () => {
         });
     }
 
-    // B. Setup Variables for Infinite Scroll
+    // B. Safe Event Listener for Clicking Outside Modals
+    const schedModal = document.getElementById('scheduleModal');
+    if (schedModal) {
+        schedModal.addEventListener('click', (event) => {
+            if (event.target === schedModal) {
+                schedModal.close();
+            }
+        });
+    }
+
+    // C. Setup Variables for Infinite Scroll
     const wrapper = document.getElementById("results-wrapper");
     const resultCount = document.getElementById("result-count");
     const status = document.getElementById("scroll-status");
     const csrfToken = document.getElementById("csrf-token")?.value || "";
     
-    // C. Infinite Scroll Logic
+    // D. Infinite Scroll Logic
     let updateCount = () => {};
     if (wrapper) {
         let loading = false;
@@ -413,7 +473,7 @@ document.addEventListener("DOMContentLoaded", () => {
         window.addEventListener("scroll", handleScroll, { passive: true });
     }
 
-    // D. Rescore Logic
+    // E. Rescore Logic
     document.addEventListener("submit", async (event) => {
         const form = event.target.closest(".rescore-form");
         if (!form) return;
@@ -438,7 +498,6 @@ document.addEventListener("DOMContentLoaded", () => {
             const data = await resp.json();
             if (!data.success) throw new Error(data.message || "Rescore failed");
             alert(data.message || "Rescored.");
-            // Reload page if status might have changed (e.g. auto-rejected)
             if(data.total_score && data.total_score < 60) {
                  window.location.reload(); 
             }
@@ -453,7 +512,7 @@ document.addEventListener("DOMContentLoaded", () => {
         if (submitBtn) submitBtn.textContent = "Done";
     });
 
-    // E. Toggle Flags (Unified Logic for Favorites)
+    // F. Toggle Flags
     document.addEventListener("change", async (event) => {
         if (!event.target.classList.contains("fav-input") && !event.target.classList.contains("fav-checkbox")) return;
         
@@ -478,11 +537,11 @@ document.addEventListener("DOMContentLoaded", () => {
         } catch (err) {
             console.error(err);
             alert("Unable to save favorite status.");
-            checkbox.checked = !isChecked; // Revert visually on error
+            checkbox.checked = !isChecked; 
         }
     });
 
-    // F. Chat Search
+    // G. Chat Search
     const chatInput = document.getElementById("chat-inline");
     const chatSessionInput = document.getElementById("chat-session-id");
     const filterForm = document.querySelector("#dashboard-filter-form");
