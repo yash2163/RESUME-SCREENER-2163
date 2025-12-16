@@ -211,10 +211,56 @@
     </td>
 
     <td>
-        <span class="score-pill {% if score.total_score >= 75 %}score-success{% elif score.total_score < 40 %}score-danger{% endif %}" 
-              style="display:inline-block; font-weight:700; padding:4px 10px; border-radius:12px; font-size:0.85rem; background:#f1f5f9; color:#334155;">
-            {{ score.total_score|floatformat:1 }}
-        </span>
+        <div style="display:flex; flex-direction:column; gap:4px; align-items:flex-start;">
+            
+            <span class="score-pill {% if score.total_score >= 75 %}score-success{% elif score.total_score < 40 %}score-danger{% endif %}" 
+                  style="display:inline-block; font-weight:700; padding:2px 8px; border-radius:12px; font-size:0.75rem; background:#f1f5f9; color:#334155;">
+                AI: {{ score.total_score|floatformat:1 }}
+            </span>
+
+            {% if score.resume.human_score is not None %}
+                <span style="display:inline-block; font-weight:700; padding:2px 8px; border-radius:12px; font-size:0.75rem; background:#eff6ff; color:#1d4ed8; border:1px solid #dbeafe; cursor:pointer;"
+                      title="Click to edit score"
+                      onclick="openHumanRateModal(
+                        {{ score.resume.id }}, 
+                        '{{ score.resume.candidate_name|escapejs }}', 
+                        [
+                          {% for item in score.detail %}
+                            { &quot;title&quot;: &quot;{{ item.title|escapejs }}&quot;, &quot;score&quot;: {{ item.score|default:0 }} }
+                            {% if not forloop.last %},{% endif %}
+                          {% empty %}
+                            { &quot;title&quot;: &quot;Overall Fit&quot;, &quot;score&quot;: 0 }
+                          {% endfor %}
+                        ],
+                        {
+                          {% for k,v in score.resume.human_score_breakdown.items %}
+                            &quot;{{ k|escapejs }}&quot;: {{ v|default:0 }}
+                            {% if not forloop.last %},{% endif %}
+                          {% endfor %}
+                        }
+                    )">
+                    Human: {{ score.resume.human_score|floatformat:1 }}
+                </span>
+            {% else %}
+                <span style="display:inline-block; font-weight:600; padding:2px 8px; border-radius:12px; font-size:0.75rem; background:#f8fafc; color:#64748b; border:1px dashed #cbd5e1; cursor:pointer;"
+                      title="Click to rate"
+                      onclick="openHumanRateModal(
+                        {{ score.resume.id }}, 
+                        '{{ score.resume.candidate_name|escapejs }}', 
+                        [
+                          {% for item in score.detail %}
+                            { &quot;title&quot;: &quot;{{ item.title|escapejs }}&quot;, &quot;score&quot;: {{ item.score|default:0 }} }
+                            {% if not forloop.last %},{% endif %}
+                          {% empty %}
+                            { &quot;title&quot;: &quot;Overall Fit&quot;, &quot;score&quot;: 0 }
+                          {% endfor %}
+                        ],
+                        {}
+                    )">
+                    + Give Score
+                </span>
+            {% endif %}
+        </div>
     </td>
 
     <td>
@@ -263,9 +309,32 @@
 
             {% endif %}
 
+            <button type="button" title="Manager Rating" 
+                    style="border:1px solid #e2e8f0; background:white; color:#4f46e5; width:30px; height:30px; border-radius:6px; cursor:pointer; display:flex; align-items:center; justify-content:center;"
+                    onclick="openHumanRateModal(
+                        {{ score.resume.id }}, 
+                        '{{ score.resume.candidate_name|escapejs }}', 
+                        [
+                          {% for item in score.detail %}
+                            { &quot;title&quot;: &quot;{{ item.title|escapejs }}&quot;, &quot;score&quot;: {{ item.score|default:0 }} }
+                            {% if not forloop.last %},{% endif %}
+                          {% empty %}
+                            { &quot;title&quot;: &quot;Overall Fit&quot;, &quot;score&quot;: 0 }
+                          {% endfor %}
+                        ],
+                        {
+                          {% for k,v in score.resume.human_score_breakdown.items %}
+                            &quot;{{ k|escapejs }}&quot;: {{ v|default:0 }}
+                            {% if not forloop.last %},{% endif %}
+                          {% endfor %}
+                        }
+                    )">
+                <i class="bi bi-person-lines-fill"></i>
+            </button>
+
             <form method="post" action="{% url 'score_rescore' score.id %}" style="display:inline;">
                 {% csrf_token %}
-                <button type="submit" title="Rescore" style="border:1px solid #e2e8f0; background:white; color:#64748b; width:30px; height:30px; border-radius:6px; cursor:pointer; display:flex; align-items:center; justify-content:center;">
+                <button type="submit" title="Rescore" style="border:1px solid #e2e8f0; background:white;margin-bottom: 0; color:#64748b; width:30px; height:30px; border-radius:6px; cursor:pointer; display:flex; align-items:center; justify-content:center;">
                     <i class="bi bi-arrow-clockwise"></i>
                 </button>
             </form>
