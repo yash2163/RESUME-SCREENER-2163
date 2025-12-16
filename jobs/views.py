@@ -23,6 +23,7 @@ from django.utils import timezone
 from django.core.mail import send_mail
 from django.views.decorators.http import require_POST
 from django.utils.dateparse import parse_datetime
+from django.db.models.functions import Coalesce
 
 from .forms import (
     JobDescriptionForm,
@@ -606,6 +607,10 @@ def dashboard(request):
     page = int(request.GET.get("page", 1))
     page_size = min(int(request.GET.get("page_size", 20)), 100)
 
+    scores = scores.annotate(
+        effective_score=Coalesce('resume__human_score', 'total_score')
+    )
+
     ordering_map = {
         "score_desc": ("-total_score",),
         "score_asc": ("total_score",),
@@ -613,6 +618,8 @@ def dashboard(request):
         "date_asc": ("resume__received_at",),
         "score_date": ("-total_score", "-resume__received_at"),
         "date_score": ("-resume__received_at", "-total_score"),
+        "human_desc": ("-effective_score", "-resume__received_at"), 
+        "human_asc": ("effective_score", "-resume__received_at"),   
     }
     
     criteria_map = {}
