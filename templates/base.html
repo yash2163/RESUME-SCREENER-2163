@@ -53,20 +53,24 @@
       }
 
       * {
+        /* background-color: blue; */
         transition: var(--transition);
       }
 
       body {
+        /* background-color: red; */
         padding: 0;
         font-family: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
         background: linear-gradient(135deg, #f9fafb 0%, #f3f4f6 100%);
         color: var(--gray-800);
       }
 
+
       main.container {
         /* background-color: red; */
-        max-width: 1200px;
+        max-width: 70%;
         padding: 2rem 1.5rem 2.5rem;
+        min-height: 100vh;
       }
 
       /* header {
@@ -197,7 +201,7 @@
         padding: 1.25rem;
         margin-bottom: 1rem;
         box-shadow: var(--shadow-sm);
-        background: #ad0a0a;
+        /* background: #ad0a0a; */
         transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
       }
 
@@ -752,22 +756,27 @@
       /* =========================================
       Score-CARD CONTAINER
       ========================================= */
-    .card {
-        background: #ffffff;
-        border: 1px solid #e2e8f0;
-        border-radius: 12px; /* Softer corners */
-        padding: 24px;
-        margin-bottom: 24px;
-        box-shadow: 0 2px 4px rgba(0,0,0,0.02);
-        transition: all 0.2s ease;
-        font-family: 'Inter', sans-serif;
-    }
 
-    .card:hover {
-        box-shadow: 0 12px 24px -6px rgba(0, 0, 0, 0.08);
-        transform: translateY(-2px);
-        border-color: #cbd5e1;
-    }
+      .score-card{
+        background-color: #ffffff;
+      }
+
+      .card {
+          /* background: #ff1919; */
+          border: 1px solid #e2e8f0;
+          border-radius: 12px; /* Softer corners */
+          padding: 24px;
+          margin-bottom: 24px;
+          box-shadow: 0 2px 4px rgba(0,0,0,0.02);
+          transition: all 0.2s ease;
+          font-family: 'Inter', sans-serif;
+      }
+
+      .card:hover {
+          box-shadow: 0 12px 24px -6px rgba(0, 0, 0, 0.08);
+          transform: translateY(-2px);
+          border-color: #cbd5e1;
+      }
 
     /* =========================================
       1. HEADER SECTION

@@ -30,6 +30,9 @@ from .forms import (
     RememberMeAuthenticationForm,
     ResumeUploadForm,
 )
+
+from django.views.decorators.http import require_POST
+
 from .models import ChatMessage, ChatSession, ErrorLog, JobDescription, Resume, ResumeScore
 from .services import (
     AttachmentPayload, 
@@ -318,6 +321,237 @@ def rescore_single_score(request, score_id):
 #     )
 
 
+@require_POST
+def shortlist_candidate(request, pk):
+    resume = get_object_or_404(Resume, pk=pk)
+    
+    # Update status to SHORTLISTED
+    resume.status = 'SHORTLISTED'
+    resume.save()
+    
+    # Return success (HTMX or standard JS will handle the UI update)
+    return JsonResponse({'status': 'success', 'message': 'Candidate shortlisted'})
+
+# import json
+
+@require_POST
+def update_human_score(request, pk):
+    resume = get_object_or_404(Resume, pk=pk)
+    
+    try:
+        data = json.loads(request.body)
+        breakdown = data.get('breakdown', {})
+        total_score = data.get('total_score', 0)
+        
+        resume.human_score_breakdown = breakdown
+        resume.human_score = total_score
+        resume.save()
+        
+        return JsonResponse({'status': 'success'})
+    except Exception as e:
+        return JsonResponse({'status': 'error', 'message': str(e)}, status=400)
+
+# @login_required
+# def dashboard(request):
+#     jobs = JobDescription.objects.all()
+#     selected_job_id = request.GET.get("job")
+#     selected_job = None
+    
+#     # --- 1. Get Base Queryset ---
+#     scores = ResumeScore.objects.select_related("resume", "job")
+    
+#     if selected_job_id:
+#         selected_job = get_object_or_404(JobDescription, pk=selected_job_id)
+#         scores = scores.filter(job=selected_job)
+#     else:
+#         scores = scores.filter(job__active=True)
+
+#     # --- 2. Filter by Tab (Status) ---
+#     current_tab = request.GET.get("tab", "inbox") # Default to Inbox
+    
+#     if current_tab == "interviews":
+#         # Show candidates who are in the interview stage
+#         scores = scores.filter(resume__status__in=['INTERVIEW_SCHEDULED', 'INTERVIEW_PASSED', 'INTERVIEW_REJECTED'])
+    
+#     elif current_tab == "rejected":
+#         # Show auto-rejected or manually rejected
+#         scores = scores.filter(resume__status__in=['AUTO_REJECTED', 'REJECTED'])
+        
+#     elif current_tab == "hired":
+#         scores = scores.filter(resume__status='HIRED')
+        
+#     else: # "inbox"
+#         # Show New, Pending, and Shortlisted (The Active Pile)
+#         # We exclude rejected/hired/interviewing to keep this view clean
+#         scores = scores.exclude(resume__status__in=['AUTO_REJECTED', 'REJECTED', 'INTERVIEW_SCHEDULED', 'HIRED'])
+
+#     # --- 3. Existing Filters (Favorites, Sort, etc.) ---
+#     favorites_only = request.GET.get("favorites")
+#     if favorites_only:
+#         scores = scores.filter(resume__is_favorite=True)
+
+#     apply_flag = request.GET.get("apply")
+#     show_results = bool(apply_flag or request.GET.get("page") or current_tab != "inbox") # Auto-load if not on default tab
+    
+#     sort = request.GET.get("sort", "score_date")
+#     view_mode = request.GET.get("view", "tiles")
+#     page = int(request.GET.get("page", 1))
+#     page_size = min(int(request.GET.get("page_size", 20)), 100)
+
+#     ordering_map = {
+#         "score_desc": ("-total_score",),
+#         "score_asc": ("total_score",),
+#         "date_desc": ("-resume__received_at",),
+#         "date_asc": ("resume__received_at",),
+#         "score_date": ("-total_score", "-resume__received_at"),
+#         "date_score": ("-resume__received_at", "-total_score"),
+#     }
+    
+#     criteria_map = {}
+#     paginator = Paginator([], page_size)
+#     page_obj = paginator.get_page(1)
+#     visible_scores = []
+
+#     # If apply clicked OR we are looking at specific tabs (like interviews), load data immediately
+#     if show_results or current_tab != 'inbox':
+#         scores = scores.order_by(*ordering_map.get(sort, ("-total_score", "-resume__received_at")))
+#         if selected_job:
+#             criteria_map = {c.id: c for c in selected_job.criteria.all()}
+        
+#         paginator = Paginator(scores, page_size)
+#         page_obj = paginator.get_page(page)
+#         visible_scores = list(page_obj.object_list)
+
+#         # Hydrate text/urls
+#         uploader = GoogleStorageUploader()
+#         for score in visible_scores:
+#             resume = score.resume
+#             signed = None
+#             if resume.file_url:
+#                 if resume.file_url.startswith("http"):
+#                     signed = resume.file_url
+#                 else:
+#                     signed = uploader.signed_url_for_blob(resume.file_url)
+#             resume.signed_url = signed
+#             if not resume.text_content:
+#                 populate_resume_text(resume, uploader)
+
+#     # Chat Session Logic (Unchanged)
+#     chat_session = None
+#     chat_messages = []
+#     session_key = request.session.get("chat_session_key")
+#     if session_key:
+#         chat_session = ChatSession.objects.filter(session_key=session_key, user=request.user).first()
+#     if not chat_session:
+#         chat_session = ChatSession.objects.create(
+#             user=request.user,
+#             session_key=uuid.uuid4().hex,
+#             metadata={"job_id": selected_job.id if selected_job else None},
+#         )
+#         request.session["chat_session_key"] = chat_session.session_key
+#     elif selected_job and chat_session.metadata.get("job_id") != selected_job.id:
+#         metadata = chat_session.metadata or {}
+#         metadata["job_id"] = selected_job.id
+#         chat_session.metadata = metadata
+#         chat_session.save(update_fields=["metadata", "updated_at"])
+#     chat_messages = list(chat_session.messages.order_by("created_at")[:20])
+
+#     if request.headers.get("x-requested-with") == "XMLHttpRequest":
+#         template_name = "jobs/partials/score_cards.html" if view_mode == "tiles" else "jobs/partials/score_rows.html"
+#         html = render_to_string(
+#             template_name,
+#             {
+#                 "scores": visible_scores,
+#                 "selected_job": selected_job,
+#                 "criteria_map": criteria_map,
+#                 "view_mode": view_mode,
+#             },
+#             request=request,
+#         )
+#         return JsonResponse(
+#             {
+#                 "html": html,
+#                 "has_next": page_obj.has_next() if show_results else False,
+#                 "next_page": page_obj.next_page_number() if show_results and page_obj.has_next() else None,
+#                 "added": len(visible_scores),
+#                 "end_index": page_obj.end_index() if show_results else 0,
+#                 "total_count": paginator.count if show_results else 0,
+#             }
+#         )
+        
+#     return render(
+#         request,
+#         "jobs/dashboard.html",
+#         {
+#             "jobs": jobs,
+#             "selected_job": selected_job,
+#             "scores": visible_scores,
+#             "criteria_map": criteria_map,
+#             "sort": sort,
+#             "view_mode": view_mode,
+#             "page_obj": page_obj,
+#             "total_count": paginator.count if show_results else 0,
+#             "page_size": page_size,
+#             "chat_session": chat_session,
+#             "chat_messages": chat_messages,
+#             "show_results": show_results,
+#             "current_tab": current_tab, # <-- Pass the tab to the template
+#         },
+#     )
+
+
+@login_required
+def export_scores_csv(request):
+    selected_job_id = request.GET.get("job")
+    scores = ResumeScore.objects.select_related("resume", "job")
+    if selected_job_id:
+        scores = scores.filter(job_id=selected_job_id)
+    else:
+        scores = scores.filter(job__active=True)
+    scores = scores.order_by("-total_score", "-resume__received_at")
+
+    response = HttpResponse(content_type="text/csv")
+    response["Content-Disposition"] = 'attachment; filename="resume_scores.csv"'
+    writer = csv.writer(response)
+    writer.writerow(
+        [
+            "Job",
+            "Resume",
+            "Candidate Name",
+            "Email",
+            "Phone",
+            "Received At",
+            "Total Score",
+            "File URL",
+            "Criteria Breakdown",
+        ]
+    )
+    uploader = GoogleStorageUploader()
+    for score in scores:
+        signed = None
+        if score.resume.file_url:
+            if score.resume.file_url.startswith("http"):
+                signed = score.resume.file_url
+            else:
+                signed = uploader.signed_url_for_blob(score.resume.file_url)
+        breakdown = "; ".join(
+            f"{item.get('title')}: {item.get('score')}" for item in score.detail or []
+        )
+        writer.writerow(
+            [
+                score.job.name,
+                score.resume.attachment_name,
+                score.resume.candidate_name,
+                score.resume.candidate_email or score.resume.sender,
+                score.resume.candidate_phone,
+                score.resume.received_at.isoformat(),
+                score.total_score,
+                signed or score.resume.file_url,
+                breakdown,
+            ]
+        )
+    return response
+
 @login_required
 def dashboard(request):
     jobs = JobDescription.objects.all()
@@ -325,6 +559,7 @@ def dashboard(request):
     selected_job = None
     
     # --- 1. Get Base Queryset ---
+    # We start with all scores and join with resume/job for performance
     scores = ResumeScore.objects.select_related("resume", "job")
     
     if selected_job_id:
@@ -333,11 +568,15 @@ def dashboard(request):
     else:
         scores = scores.filter(job__active=True)
 
-    # --- 2. Filter by Tab (Status) ---
+    # --- 2. Filter by Tab (Status Logic Updated) ---
     current_tab = request.GET.get("tab", "inbox") # Default to Inbox
     
-    if current_tab == "interviews":
-        # Show candidates who are in the interview stage
+    if current_tab == "shortlisted":
+        # NEW: Only show manually shortlisted candidates
+        scores = scores.filter(resume__status='SHORTLISTED')
+
+    elif current_tab == "interviews":
+        # Show candidates in the interview loop
         scores = scores.filter(resume__status__in=['INTERVIEW_SCHEDULED', 'INTERVIEW_PASSED', 'INTERVIEW_REJECTED'])
     
     elif current_tab == "rejected":
@@ -345,12 +584,13 @@ def dashboard(request):
         scores = scores.filter(resume__status__in=['AUTO_REJECTED', 'REJECTED'])
         
     elif current_tab == "hired":
+        # Show hired candidates
         scores = scores.filter(resume__status='HIRED')
         
     else: # "inbox"
-        # Show New, Pending, and Shortlisted (The Active Pile)
-        # We exclude rejected/hired/interviewing to keep this view clean
-        scores = scores.exclude(resume__status__in=['AUTO_REJECTED', 'REJECTED', 'INTERVIEW_SCHEDULED', 'HIRED'])
+        # DEFAULT: Show ONLY 'New' candidates.
+        # This ensures Shortlisted people disappear from here.
+        scores = scores.filter(resume__status='NEW')
 
     # --- 3. Existing Filters (Favorites, Sort, etc.) ---
     favorites_only = request.GET.get("favorites")
@@ -358,7 +598,8 @@ def dashboard(request):
         scores = scores.filter(resume__is_favorite=True)
 
     apply_flag = request.GET.get("apply")
-    show_results = bool(apply_flag or request.GET.get("page") or current_tab != "inbox") # Auto-load if not on default tab
+    # Auto-load results if we are not on the default blank inbox, or if user clicked 'Apply'
+    show_results = bool(apply_flag or request.GET.get("page") or current_tab != "inbox")
     
     sort = request.GET.get("sort", "score_date")
     view_mode = request.GET.get("view", "tiles")
@@ -379,8 +620,8 @@ def dashboard(request):
     page_obj = paginator.get_page(1)
     visible_scores = []
 
-    # If apply clicked OR we are looking at specific tabs (like interviews), load data immediately
-    if show_results or current_tab != 'inbox':
+    # If apply clicked OR we are looking at specific tabs, load data immediately
+    if show_results:
         scores = scores.order_by(*ordering_map.get(sort, ("-total_score", "-resume__received_at")))
         if selected_job:
             criteria_map = {c.id: c for c in selected_job.criteria.all()}
@@ -400,6 +641,7 @@ def dashboard(request):
                 else:
                     signed = uploader.signed_url_for_blob(resume.file_url)
             resume.signed_url = signed
+            # Populate text if missing (optional lazy load)
             if not resume.text_content:
                 populate_resume_text(resume, uploader)
 
@@ -462,62 +704,9 @@ def dashboard(request):
             "chat_session": chat_session,
             "chat_messages": chat_messages,
             "show_results": show_results,
-            "current_tab": current_tab, # <-- Pass the tab to the template
+            "current_tab": current_tab, # Pass tab to UI so we can highlight the active button
         },
     )
-
-
-@login_required
-def export_scores_csv(request):
-    selected_job_id = request.GET.get("job")
-    scores = ResumeScore.objects.select_related("resume", "job")
-    if selected_job_id:
-        scores = scores.filter(job_id=selected_job_id)
-    else:
-        scores = scores.filter(job__active=True)
-    scores = scores.order_by("-total_score", "-resume__received_at")
-
-    response = HttpResponse(content_type="text/csv")
-    response["Content-Disposition"] = 'attachment; filename="resume_scores.csv"'
-    writer = csv.writer(response)
-    writer.writerow(
-        [
-            "Job",
-            "Resume",
-            "Candidate Name",
-            "Email",
-            "Phone",
-            "Received At",
-            "Total Score",
-            "File URL",
-            "Criteria Breakdown",
-        ]
-    )
-    uploader = GoogleStorageUploader()
-    for score in scores:
-        signed = None
-        if score.resume.file_url:
-            if score.resume.file_url.startswith("http"):
-                signed = score.resume.file_url
-            else:
-                signed = uploader.signed_url_for_blob(score.resume.file_url)
-        breakdown = "; ".join(
-            f"{item.get('title')}: {item.get('score')}" for item in score.detail or []
-        )
-        writer.writerow(
-            [
-                score.job.name,
-                score.resume.attachment_name,
-                score.resume.candidate_name,
-                score.resume.candidate_email or score.resume.sender,
-                score.resume.candidate_phone,
-                score.resume.received_at.isoformat(),
-                score.total_score,
-                signed or score.resume.file_url,
-                breakdown,
-            ]
-        )
-    return response
 
 
 @login_required
@@ -815,3 +1004,42 @@ def update_status(request, score_id):
     
     # Refresh the page (stay on current tab)
     return redirect(request.META.get('HTTP_REFERER', 'dashboard'))
+
+
+
+# jobs/views.py
+import json
+from django.http import JsonResponse
+from django.views.decorators.http import require_POST
+from django.shortcuts import get_object_or_404
+from .models import Resume
+
+@require_POST
+def update_human_score(request, pk):
+    resume = get_object_or_404(Resume, pk=pk)
+    
+    try:
+        data = json.loads(request.body)
+        breakdown = data.get('breakdown', {}) # {'Python': 80, 'Communication': 90}
+        
+        # Calculate Aggregate Average
+        if breakdown:
+            # Convert values to floats and filter out empty ones
+            scores = []
+            for k, v in breakdown.items():
+                try:
+                    scores.append(float(v))
+                except (ValueError, TypeError):
+                    continue
+            
+            if scores:
+                total_avg = sum(scores) / len(scores)
+                resume.human_score = round(total_avg, 1)
+                resume.human_score_breakdown = breakdown
+                resume.save()
+                return JsonResponse({'status': 'success'})
+        
+        return JsonResponse({'status': 'error', 'message': 'No valid scores provided'})
+
+    except Exception as e:
+        return JsonResponse({'status': 'error', 'message': str(e)}, status=400)

@@ -56,6 +56,7 @@ class Resume(models.Model):
     # --- ENHANCED TRACKING FIELDS ---
     STATUS_CHOICES = [
         ('NEW', 'New / Pending'),             # Just arrived, not scored yet
+        ('SHORTLISTED', 'Shortlisted'),
         ('AUTO_REJECTED', 'Auto Rejected'),   # AI Score < Threshold
         ('SHORTLISTED', 'Shortlisted'),       # AI Score > Threshold, waiting for action
         ('INTERVIEW_SCHEDULED', 'Interview Scheduled'), # Email sent
@@ -82,6 +83,10 @@ class Resume(models.Model):
     # --- Human Feedback ---
     # To store notes like: "Good communication, but weak in Python"
     recruiter_notes = models.TextField(blank=True)
+
+    # human scores
+    human_score = models.FloatField(null=True, blank=True)
+    human_score_breakdown = models.JSONField(default=dict, blank=True)
 
     class Meta:
         unique_together = ("message_id", "attachment_name")

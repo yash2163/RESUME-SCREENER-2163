@@ -1,4 +1,4 @@
-{% load tz %}
+<!-- {% load tz %}
 {% for score in scores %}
 <tr class="score-row">
     <td>
@@ -93,6 +93,174 @@
                          onclick="openScheduleModal('{{ score.id }}', '{{ score.resume.candidate_name|escapejs }}', '{{ score.job.name|escapejs }}')">
                     <i class="bi bi-calendar-event"></i>
                 </button>
+            {% endif %}
+
+            <form method="post" action="{% url 'score_rescore' score.id %}" style="display:inline;">
+                {% csrf_token %}
+                <button type="submit" title="Rescore" style="border:1px solid #e2e8f0; background:white; color:#64748b; width:30px; height:30px; border-radius:6px; cursor:pointer; display:flex; align-items:center; justify-content:center;">
+                    <i class="bi bi-arrow-clockwise"></i>
+                </button>
+            </form>
+        </div>
+    </td>
+</tr>
+
+<tr class="criteria-row" style="background:#f8fafc;">
+  <td colspan="8" style="padding:10px 15px; border-bottom:2px solid #e2e8f0;">
+    <div style="font-size:0.85rem; color:#475569;">
+        <strong>Score Breakdown:</strong>
+        <ul style="margin:5px 0 0 0; padding-left:20px; list-style-type:disc;">
+          {% for item in score.detail %}
+          <li style="margin-bottom:2px;">
+            <span style="font-weight:600; color:#334155;">{{ item.title }}</span>: 
+            <span class="{% if item.score >= 75 %}score-high{% elif item.score < 40 %}score-low{% endif %}" style="font-weight:700;">
+                {{ item.score }}
+            </span>
+            {% if item.notes %}
+                <span style="color:#94a3b8; font-style:italic;"> - {{ item.notes }}</span>
+            {% endif %}
+          </li>
+          {% empty %}
+          <li>No breakdown details available.</li>
+          {% endfor %}
+        </ul>
+    </div>
+  </td>
+</tr>
+{% endfor %} -->
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+{% load tz %}
+{% for score in scores %}
+<tr class="score-row" id="row-{{ score.resume.id }}" style="opacity: 1; transition: opacity 0.3s;">
+    <td>
+        <span style="font-weight:600; color:#334155;">{{ score.job.name }}</span>
+    </td>
+
+    <td>
+        {% if score.resume.file_url %}
+            <a href="{{ score.resume.signed_url|default:score.resume.file_url }}" target="_blank" style="color:#2563eb; text-decoration:none;">
+                <i class="bi bi-file-earmark-text"></i> {{ score.resume.attachment_name|truncatechars:25 }}
+            </a>
+        {% else %}
+            {{ score.resume.attachment_name|truncatechars:25 }}
+        {% endif %}
+    </td>
+
+    <td>
+        <div style="font-weight:700; color:#0f172a;">
+            {{ score.resume.candidate_name|default:"Unknown" }}
+        </div>
+    </td>
+
+    <td>
+        {% if score.resume.status == 'SHORTLISTED' %}
+            <span style="background:#f0fdf4; color:#15803d; padding:2px 8px; border-radius:4px; font-size:0.75rem; font-weight:600; border:1px solid #bbf7d0;">
+                Shortlisted
+            </span>
+        {% elif score.resume.status == 'INTERVIEW_SCHEDULED' %}
+            <span style="background:#e0f2fe; color:#0369a1; padding:2px 8px; border-radius:4px; font-size:0.75rem; font-weight:600; border:1px solid #bae6fd;">
+                Interview Set
+            </span>
+        {% elif score.resume.status == 'AUTO_REJECTED' %}
+            <span style="background:#fee2e2; color:#991b1b; padding:2px 8px; border-radius:4px; font-size:0.75rem; font-weight:600; border:1px solid #fecaca;">
+                Auto Rejected
+            </span>
+        {% elif score.resume.status == 'INTERVIEW_REJECTED' or score.resume.status == 'REJECTED' %}
+            <span style="background:#fee2e2; color:#991b1b; padding:2px 8px; border-radius:4px; font-size:0.75rem; font-weight:600; border:1px solid #fecaca;">
+                Rejected
+            </span>
+        {% elif score.resume.status == 'HIRED' %}
+            <span style="background:#dcfce7; color:#166534; padding:2px 8px; border-radius:4px; font-size:0.75rem; font-weight:600; border:1px solid #bbf7d0;">
+                Hired
+            </span>
+        {% else %}
+            <span style="background:#f1f5f9; color:#64748b; padding:2px 8px; border-radius:4px; font-size:0.75rem; font-weight:600;">
+                {{ score.resume.get_status_display }}
+            </span>
+        {% endif %}
+    </td>
+
+    <td>
+        <div style="font-size:0.8rem; line-height:1.4; color:#475569;">
+            <div>{{ score.resume.candidate_email|default:"-" }}</div>
+            <div>{{ score.resume.candidate_phone|default:"-" }}</div>
+        </div>
+    </td>
+
+    <td style="font-size:0.8rem; color:#64748b;">
+        {{ score.resume.received_at|timezone:"Asia/Kolkata"|date:"M d, Y" }}
+    </td>
+
+    <td>
+        <span class="score-pill {% if score.total_score >= 75 %}score-success{% elif score.total_score < 40 %}score-danger{% endif %}" 
+              style="display:inline-block; font-weight:700; padding:4px 10px; border-radius:12px; font-size:0.85rem; background:#f1f5f9; color:#334155;">
+            {{ score.total_score|floatformat:1 }}
+        </span>
+    </td>
+
+    <td>
+        <div style="display:flex; gap:6px; align-items:center;">
+            
+            {% if score.resume.status == 'INTERVIEW_SCHEDULED' %}
+                <form method="post" action="{% url 'update_status' score.id %}" style="display:inline;">
+                    {% csrf_token %}
+                    <input type="hidden" name="action" value="hire">
+                    <button type="submit" title="Hire" style="border:1px solid #bbf7d0; background:#f0fdf4; color:#166534; width:30px; height:30px; border-radius:6px; cursor:pointer; display:flex; align-items:center; justify-content:center;">
+                        <i class="bi bi-check-lg"></i>
+                    </button>
+                </form>
+                <form method="post" action="{% url 'update_status' score.id %}" style="display:inline;" onsubmit="return confirm('Reject candidate?');">
+                    {% csrf_token %}
+                    <input type="hidden" name="action" value="reject">
+                    <button type="submit" title="Reject" style="border:1px solid #fecaca; background:#fef2f2; color:#991b1b; width:30px; height:30px; border-radius:6px; cursor:pointer; display:flex; align-items:center; justify-content:center;">
+                        <i class="bi bi-x-lg"></i>
+                    </button>
+                </form>
+
+            {% elif score.resume.status == 'HIRED' %}
+                <span style="color:#166534; font-size:1.2rem;">
+                    <i class="bi bi-trophy-fill"></i>
+                </span>
+
+            {% else %}
+                
+                {% if score.resume.status == 'NEW' or score.resume.status == 'PENDING' %}
+                <button type="button" title="Shortlist Candidate" 
+                        style="border:1px solid #a7f3d0; background:#ecfdf5; color:#059669; width:30px; height:30px; border-radius:6px; cursor:pointer; display:flex; align-items:center; justify-content:center;"
+                        onclick="shortlistCandidate({{ score.resume.id }}, this)">
+                   <i class="bi bi-check-circle-fill"></i>
+               </button>
+               {% endif %}
+
+               {% if score.resume.status != 'AUTO_REJECTED' and score.resume.status != 'REJECTED' and score.resume.status != 'INTERVIEW_REJECTED' %}
+                   {% if score.resume.status == 'SHORTLISTED' or score.resume.status == 'NEW' %}
+                     <button type="button" title="Schedule Interview" 
+                             style="border:1px solid #e2e8f0; background:white; color:#475569; width:30px; height:30px; border-radius:6px; cursor:pointer; display:flex; align-items:center; justify-content:center;"
+                             onclick="openScheduleModal('{{ score.id }}', '{{ score.resume.candidate_name|escapejs }}', '{{ score.job.name|escapejs }}')">
+                        <i class="bi bi-calendar-event"></i>
+                    </button>
+                    {% endif %}
+                {% endif %}
+
             {% endif %}
 
             <form method="post" action="{% url 'score_rescore' score.id %}" style="display:inline;">
