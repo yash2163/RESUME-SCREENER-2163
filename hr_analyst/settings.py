@@ -8,15 +8,16 @@ load_dotenv()
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-# If the environment variable is set, use it. Otherwise, default to the mounted path.
-if os.environ.get("GOOGLE_APPLICATION_CREDENTIALS"):
-    # This is strictly for the server environment
-    pass 
-else:
-    # Local fallback if you want, or just rely on the env var
-    os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = "/app/credentials.json"
+# # If the environment variable is set, use it. Otherwise, default to the mounted path.
+# if os.environ.get("GOOGLE_APPLICATION_CREDENTIALS"):
+#     # This is strictly for the server environment
+#     pass 
+# else:
+#     # Local fallback if you want, or just rely on the env var
+#     os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = "/app/credentials.json"
 
-    
+# Force the app to use the embedded key
+os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = "/app/credentials.json"
 
 SECRET_KEY = os.environ.get("SECRET_KEY", "dev-secret-key")
 DEBUG = os.environ.get("DEBUG", "0") == "1"
@@ -93,7 +94,8 @@ USE_TZ = True
 STATIC_URL = "static/"
 STATIC_ROOT = BASE_DIR / "staticfiles"
 STATICFILES_DIRS = [BASE_DIR / "static"]
-STATICFILES_STORAGE = "whitenoise.storage.CompressedManifestStaticFilesStorage"
+# STATICFILES_STORAGE = "whitenoise.storage.CompressedManifestStaticFilesStorage"
+STATICFILES_STORAGE = "whitenoise.storage.CompressedStaticFilesStorage"
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 

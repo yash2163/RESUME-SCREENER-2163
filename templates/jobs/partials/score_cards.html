@@ -240,9 +240,10 @@ modal.addEventListener('click', (event) => {
 
 
 
-
+<input type="hidden" id="global-csrf" name="csrfmiddlewaretoken" value="{{ csrf_token }}">
 {% load tz %} 
 {% for score in scores %}
+
 <article class="score-card" id="card-{{ score.resume.id }}" style="opacity: 1; transition: opacity 0.3s;">
   <div class="score-header">
     
@@ -269,14 +270,49 @@ modal.addEventListener('click', (event) => {
         </span>
       {% elif score.resume.status == 'INTERVIEW_REJECTED' or score.resume.status == 'REJECTED' %}
         <span class="status-tag rejected" style="font-size:0.75rem; background:#fee2e2; color:#991b1b; padding:2px 6px; border-radius:4px; margin-left:8px; font-weight:600;">
-            <i class="bi bi-x-circle"></i> Rejected
+            <i class="bi bi-x-circle"></i> Rejected after Interview
         </span>
       {% elif score.resume.status == 'HIRED' %}
         <span class="status-tag hired" style="font-size:0.75rem; background:#dcfce7; color:#166534; padding:2px 6px; border-radius:4px; margin-left:8px; font-weight:600;">
             <i class="bi bi-trophy-fill"></i> Hired
         </span>
-      {% endif %}
+      {% endif %} 
     </div>
+
+    <details class="text-details" style="border-top:1px solid #f1f5f9; padding-top:8px; margin-top:8px;">
+        <summary style="font-size:0.85rem; color:#64748b; cursor:pointer;">
+            <i class="bi bi-clock-history"></i> Activity History
+        </summary>
+        
+        <div class="activity-log-container">
+            {% for log in score.resume.logs.all %}
+            <div class="log-entry">
+                <div class="log-time">
+                    {{ log.timestamp|date:"M d, H:i" }}
+                </div>
+                
+                <div class="log-content">
+                    <span class="log-title">
+                        {{ log.get_action_type_display }}
+                        {% if log.user %}
+                            <span class="log-user">by {{ log.user.username }}</span>
+                        {% endif %}
+                    </span>
+                    
+                    {% if log.details %}
+                    <div class="log-details">
+                        {{ log.details }}
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+            {% empty %}
+            <div style="text-align:center; color:#94a3b8; font-size:0.8rem; font-style:italic; padding:10px;">
+                No history recorded yet.
+            </div>
+            {% endfor %}
+        </div>
+    </details>
 
     <div class="header-right">
         
@@ -339,7 +375,7 @@ modal.addEventListener('click', (event) => {
         </div>
 
         <div class="action-row">
-            
+    
             {% if score.resume.signed_url %}
             <a class="icon-btn" href="{{ score.resume.signed_url }}" target="_blank" title="Download CV">
                 <i class="bi bi-download"></i>
@@ -355,6 +391,28 @@ modal.addEventListener('click', (event) => {
                 <i class="bi bi-envelope"></i>
             </a>
             {% endif %}
+
+            <button class="icon-btn" title="Manager Rating"
+                onclick="openHumanRateModal(
+                    {{ score.resume.id }}, 
+                    '{{ score.resume.candidate_name|escapejs }}', 
+                    [
+                    {% for item in score.detail %}
+                        { &quot;title&quot;: &quot;{{ item.title|escapejs }}&quot;, &quot;score&quot;: {{ item.score|default:0 }} }
+                        {% if not forloop.last %},{% endif %}
+                    {% empty %}
+                        { &quot;title&quot;: &quot;Overall Fit&quot;, &quot;score&quot;: 0 }
+                    {% endfor %}
+                    ],
+                    {
+                    {% for k,v in score.resume.human_score_breakdown.items %}
+                        &quot;{{ k|escapejs }}&quot;: {{ v|default:0 }}
+                        {% if not forloop.last %},{% endif %}
+                    {% endfor %}
+                    }
+                )">
+                <i class="bi bi-person-lines-fill"></i>
+            </button>
 
             {% if score.resume.status == 'INTERVIEW_SCHEDULED' %}
                 <form method="post" action="{% url 'update_status' score.id %}" style="display:inline;">
@@ -373,18 +431,24 @@ modal.addEventListener('click', (event) => {
                 </form>
 
             {% elif score.resume.status == 'HIRED' %}
-                 <span class="icon-btn" style="background:#dcfce7; color:#166534; border:none; cursor:default;">
+                    <span class="icon-btn" style="background:#dcfce7; color:#166534; border:none; cursor:default;">
                     <i class="bi bi-trophy-fill"></i>
-                 </span>
+                    </span>
 
             {% else %}
-                
-                {% if score.resume.status == 'NEW' or score.resume.status == 'PENDING' %}
-                <button class="icon-btn" title="Shortlist Candidate" 
-                        onclick="shortlistCandidate({{ score.resume.id }}, this)"
-                        style="color: #059669; border-color: #a7f3d0; background: #ecfdf5;">
-                    <i class="bi bi-check-circle-fill"></i>
-                </button>
+                {% if score.resume.status == 'NEW' or score.resume.status == 'PENDING' or score.resume.status == 'SHORTLISTED' %}
+                    <button class="icon-btn shortlist-btn" 
+                            title="{% if score.resume.status == 'SHORTLISTED' %}Remove from Shortlist{% else %}Shortlist Candidate{% endif %}" 
+                            onclick="shortlistCandidate({{ score.resume.id }}, this)"
+                            data-status="{{ score.resume.status }}"
+                            style="transition: all 0.2s; 
+                                {% if score.resume.status == 'SHORTLISTED' %}
+                                    color: #ffffff; background: #059669; border-color: #047857; /* Active (Dark Green) */
+                                {% else %}
+                                    color: #059669; background: #ecfdf5; border-color: #a7f3d0; /* Inactive (Light Green) */
+                                {% endif %}">
+                        <i class="bi {% if score.resume.status == 'SHORTLISTED' %}bi-check-circle-fill{% else %}bi-check-circle{% endif %}"></i>
+                    </button>
                 {% endif %}
 
                 {% if score.resume.status != 'AUTO_REJECTED' and score.resume.status != 'INTERVIEW_REJECTED' and score.resume.status != 'REJECTED' %}
@@ -398,27 +462,15 @@ modal.addEventListener('click', (event) => {
 
             {% endif %}
 
-            <button class="icon-btn" title="Manager Rating"
-                onclick="openHumanRateModal(
-                    {{ score.resume.id }}, 
-                    '{{ score.resume.candidate_name|escapejs }}', 
-                    [
-                      {% for item in score.detail %}
-                        { &quot;title&quot;: &quot;{{ item.title|escapejs }}&quot;, &quot;score&quot;: {{ item.score|default:0 }} }
-                        {% if not forloop.last %},{% endif %}
-                      {% empty %}
-                        { &quot;title&quot;: &quot;Overall Fit&quot;, &quot;score&quot;: 0 }
-                      {% endfor %}
-                    ],
-                    {
-                      {% for k,v in score.resume.human_score_breakdown.items %}
-                        &quot;{{ k|escapejs }}&quot;: {{ v|default:0 }}
-                        {% if not forloop.last %},{% endif %}
-                      {% endfor %}
-                    }
-                )">
-                <i class="bi bi-person-lines-fill"></i>
-            </button>
+            <label class="fav-wrapper" title="Mark as Favorite" style="margin-left:auto;"> <input type="checkbox" class="fav-input" 
+                        data-resume-id="{{ score.resume.id }}" 
+                        data-field="is_favorite" 
+                        data-value="{% if score.resume.is_favorite %}false{% else %}true{% endif %}"
+                        {% if score.resume.is_favorite %}checked{% endif %} />
+                <div class="icon-btn fav-btn">
+                    <i class="bi {% if score.resume.is_favorite %}bi-star-fill{% else %}bi-star{% endif %}"></i>
+                </div>
+            </label>
 
             <form method="post" action="{% url 'score_rescore' score.id %}" style="display:inline;">
                 {% csrf_token %}
@@ -427,16 +479,6 @@ modal.addEventListener('click', (event) => {
                 </button>
             </form>
             
-            <label class="fav-wrapper" title="Mark as Favorite">
-                <input type="checkbox" class="fav-input" 
-                       data-resume-id="{{ score.resume.id }}" 
-                       data-field="is_favorite" 
-                       data-value="{% if score.resume.is_favorite %}false{% else %}true{% endif %}"
-                       {% if score.resume.is_favorite %}checked{% endif %} />
-                <div class="icon-btn fav-btn">
-                    <i class="bi {% if score.resume.is_favorite %}bi-star-fill{% else %}bi-star{% endif %}"></i>
-                </div>
-            </label>
         </div>
     </div>
   </div>

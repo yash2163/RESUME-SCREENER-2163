@@ -781,6 +781,7 @@ from django.db.models import Q  # <--- NEW IMPORT
 from django.utils import timezone
 from pypdf import PdfReader
 from docx import Document
+from.utils import log_activity
 
 from django.core.mail import send_mail
 
@@ -850,7 +851,7 @@ class GeminiEvaluator:
         self.api_key = api_key or settings.GEMINI_API_KEY
         self.vertex_project = settings.VERTEX_PROJECT_ID
         self.vertex_location = settings.VERTEX_LOCATION
-        self.vertex_model_name = settings.VERTEX_MODEL or "gemini-1.5-pro"
+        self.vertex_model_name = settings.VERTEX_MODEL or "gemini-2.5-pro"
         self.model = None
 
         if self.api_key:
@@ -1144,28 +1145,38 @@ class M365InboxReader:
         return attachments
 
 
+
 class ResumeIngestor:
     def __init__(
         self,
-        scorer: Optional[GeminiEvaluator] = None,
-        uploader: Optional[GoogleStorageUploader] = None,
+        scorer: Optional['GeminiEvaluator'] = None,
+        uploader: Optional['GoogleStorageUploader'] = None,
         max_workers: Optional[int] = None,
         score_workers: Optional[int] = None,
     ):
+        # REMOVED the invalid import: from .ai import GeminiEvaluator
+        
         self.scorer = scorer
-        self.uploader = uploader or GoogleStorageUploader()
+        # If GoogleStorageUploader is in this file, use it directly. 
+        # If it's in a separate file (e.g. storage.py), keep the import but fix the path.
+        # Assuming for now it is in services.py or imported at top:
+        self.uploader = uploader or GoogleStorageUploader() 
+        
         self.max_workers = max_workers or getattr(settings, "INGEST_MAX_WORKERS", 4)
         self.score_workers = score_workers or getattr(settings, "INGEST_SCORE_WORKERS", self.max_workers)
         self._scorer_local = threading.local()
 
-    def _get_scorer(self) -> GeminiEvaluator:
+    def _get_scorer(self) -> 'GeminiEvaluator':
+        # REMOVED the invalid import here too.
         if not getattr(self._scorer_local, "instance", None):
+            # Just instantiate it directly since it's in the same file
             self._scorer_local.instance = self.scorer or GeminiEvaluator()
         return self._scorer_local.instance
 
     def _score_resume_for_jobs(self, resume: Resume, text_content: str, jobs: List[JobDescription]) -> None:
         if not jobs:
             return
+        
         max_workers = max(1, min(self.score_workers, len(jobs)))
 
         def score_job(job: JobDescription):
@@ -1185,13 +1196,8 @@ class ResumeIngestor:
                     job, total, detail = future.result()
                     results.append((job, total, detail))
                 except Exception as exc:
-                    logger.exception("Scoring failed", extra={"job_id": getattr(future_map[future], "id", None), "error": str(exc)})
-                    record_error(
-                        location="ingest:score_job",
-                        message="Resume scoring failed",
-                        details=str(exc),
-                        context={"job_id": getattr(future_map[future], "id", None), "resume_id": getattr(resume, "id", None)},
-                    )
+                    job_ref = future_map[future]
+                    logger.exception("Scoring failed", extra={"job_id": job_ref.id, "error": str(exc)})
 
         for job, total, detail in results:
             # 1. Create/Update the score object
@@ -1201,7 +1207,7 @@ class ResumeIngestor:
                 defaults={"total_score": total, "detail": detail},
             )
             
-            # 2. TRIGGER AUTOMATION
+            # 2. TRIGGER AUTOMATION (Assuming check_and_process_automation is defined in this file)
             try:
                 check_and_process_automation(score_obj)
             except Exception as e:
@@ -1211,21 +1217,20 @@ class ResumeIngestor:
         try:
             sender_clean = clean_string(attachment.sender or "") if attachment.sender else None
             candidate_name = clean_string(attachment.attachment_name.rsplit(".", 1)[0])[:255]
+            
             resume, _ = Resume.objects.get_or_create(
                 message_id=attachment.message_id,
                 attachment_name=attachment.attachment_name,
                 defaults={
                     "sender": sender_clean,
                     "candidate_email": sender_clean,
-                    "candidate_phone": "",
                     "candidate_name": candidate_name,
                     "text_content": "",
-                    "file_url": "",
                     "received_at": attachment.received_at,
                     "source": attachment.source or ResumeSource.EMAIL,
-                    "is_active_seeker": infer_active_seeker(sender_clean, sender_clean, attachment.source),
                 },
             )
+            
             detail = [{"title": "Processing failed", "score": 0, "notes": truncate(str(error), 200)}]
             for job in jobs:
                 ResumeScore.objects.update_or_create(
@@ -1239,7 +1244,6 @@ class ResumeIngestor:
     def _ingest_single(self, attachment: AttachmentPayload, jobs: List[JobDescription]) -> int:
         close_old_connections()
         try:
-            # 1. Parse content to get Email/Phone
             raw_text = extract_text_from_attachment(attachment.attachment_name, attachment.content)
             text_content = clean_string(raw_text)
             phone = extract_phone_number(text_content)
@@ -1248,82 +1252,66 @@ class ResumeIngestor:
             sender_clean = clean_string(attachment.sender or "") if attachment.sender else None
             candidate_email = text_email or sender_clean
 
-            # --- 2. NEW: DUPLICATE CHECK LOGIC ---
-            # Criteria: (Email OR Phone matches) AND (Already scored for ANY of the target jobs)
-            if candidate_email or phone:
-                # Find existing resumes matching this person
-                query = Q()
-                if candidate_email:
-                    query |= Q(candidate_email=candidate_email) | Q(sender=candidate_email)
-                if phone:
-                    query |= Q(candidate_phone=phone)
-                
-                existing_resumes = Resume.objects.filter(query)
-
-                # Check if this person has applied to ANY of the active jobs in this ingestion list
-                for job in jobs:
-                    if ResumeScore.objects.filter(resume__in=existing_resumes, job=job).exists():
-                        logger.info(f"Duplicate detected: {candidate_email} has already applied for {job.name}")
-                        
-                        # Send Notification Email
-                        if candidate_email:
-                            try:
-                                send_mail(
-                                    f"Application Status: {job.name}",
-                                    f"Hello,\n\nWe received your application for {job.name}. "
-                                    "Our records show you have already applied for this position. "
-                                    "We are reviewing your previous application.\n\nBest,\nHR Team",
-                                    settings.DEFAULT_FROM_EMAIL,
-                                    [candidate_email],
-                                    fail_silently=True
-                                )
-                            except Exception:
-                                pass
-                        
-                        return 0  # Stop processing this resume entirely
-
-    
-
-            # 3. Upload & Save (If not duplicate)
             storage_path = f"resumes/{attachment.message_id}/{attachment.attachment_name}"
             content_type = "application/pdf" if attachment.attachment_name.lower().endswith(".pdf") else "text/plain"
+            
             file_url = truncate(
                 self.uploader.upload(storage_path, attachment.content, content_type=content_type) or "",
                 2000,
             )
             candidate_name = clean_string(attachment.attachment_name.rsplit(".", 1)[0])[:255]
-            
-            resume, created = Resume.objects.get_or_create(
-                message_id=attachment.message_id,
-                attachment_name=attachment.attachment_name,
-                defaults={
-                    "sender": sender_clean,
-                    "candidate_email": candidate_email,
-                    "candidate_phone": phone,
-                    "candidate_name": candidate_name,
-                    "text_content": text_content,
-                    "file_url": file_url or "",
-                    "received_at": attachment.received_at,
-                    "source": attachment.source or ResumeSource.EMAIL,
-                    "is_active_seeker": infer_active_seeker(sender_clean, candidate_email, attachment.source),
-                },
-            )
-            if not created:
-                if resume.text_content:
-                    return 0
-                resume.sender = sender_clean
-                resume.candidate_email = candidate_email
-                resume.candidate_phone = phone
-                resume.candidate_name = candidate_name
+
+            # CHECK EXISTING
+            existing_resume = None
+            if candidate_email or phone:
+                query = Q()
+                if candidate_email:
+                    query |= Q(candidate_email=candidate_email) | Q(sender=candidate_email)
+                if phone:
+                    query |= Q(candidate_phone=phone)
+                existing_resume = Resume.objects.filter(query).order_by('-received_at').first()
+
+            # CREATE OR UPDATE
+            if existing_resume:
+                logger.info(f"Updating existing resume for {candidate_email or phone}")
+                resume = existing_resume
+                resume.file_url = file_url
                 resume.text_content = text_content
-                resume.file_url = file_url or ""
                 resume.received_at = attachment.received_at
-                resume.source = attachment.source or ResumeSource.EMAIL
+                resume.message_id = attachment.message_id
+                resume.attachment_name = attachment.attachment_name
+                
+                if candidate_email: resume.candidate_email = candidate_email
+                if phone: resume.candidate_phone = phone
+                if candidate_name: resume.candidate_name = candidate_name
+
+                resume.status = 'PENDING'
+                resume.human_score = None
+                resume.human_score_breakdown = {}
                 resume.is_active_seeker = infer_active_seeker(sender_clean, candidate_email, attachment.source)
-                resume.save(update_fields=["sender", "candidate_email", "candidate_phone", "candidate_name", "text_content", "file_url", "received_at", "source", "is_active_seeker"])
+                resume.save()
+                log_activity(resume, 'INGESTED', f"Updated via {attachment.source or 'Unknown'}")
+            else:
+                logger.info(f"Creating new resume for {candidate_email or phone}")
+                resume = Resume.objects.create(
+                    message_id=attachment.message_id,
+                    attachment_name=attachment.attachment_name,
+                    sender=sender_clean,
+                    candidate_email=candidate_email,
+                    candidate_phone=phone,
+                    candidate_name=candidate_name,
+                    text_content=text_content,
+                    file_url=file_url or "",
+                    received_at=attachment.received_at,
+                    source=attachment.source or ResumeSource.EMAIL,
+                    is_active_seeker=infer_active_seeker(sender_clean, candidate_email, attachment.source),
+                    status='PENDING'
+                )
+                log_activity(resume, 'INGESTED', f"New application via {attachment.source or 'Unknown'}")
 
             self._score_resume_for_jobs(resume, text_content, jobs)
             return 1
+
         except Exception as exc:
             logger.exception("Resume ingest failed", extra={"error": str(exc)})
             self._record_failure(attachment, jobs, exc)
@@ -1338,6 +1326,7 @@ class ResumeIngestor:
         jobs = jobs or list(JobDescription.objects.filter(active=True))
         max_workers = max(1, min(self.max_workers, len(attachments)))
         saved_count = 0
+        
         with ThreadPoolExecutor(max_workers=max_workers) as executor:
             futures = [executor.submit(self._ingest_single, attachment, jobs) for attachment in attachments]
             for future in as_completed(futures):
@@ -1375,6 +1364,8 @@ def populate_resume_text(resume: Resume, uploader: Optional[GoogleStorageUploade
     return True
 
 
+# jobs/automation.py
+
 def check_and_process_automation(resume_score):
     resume = resume_score.resume
     score_val = resume_score.total_score
@@ -1382,26 +1373,39 @@ def check_and_process_automation(resume_score):
 
     # 1. AUTO REJECTION LOGIC
     if score_val < threshold:
-        resume.status = 'AUTO_REJECTED'
-        resume.save()
-        if not resume.rejection_email_sent and resume.candidate_email:
-            subject = f"Update regarding your application at {resume_score.job.name}"
-            message = (
-                f"Dear {resume.candidate_name or 'Candidate'},\n\n"
-                f"Thank you for your interest in the {resume_score.job.name} position. "
-                "We appreciate the time you took to apply.\n\n"
-                "After reviewing your application, we have decided not to proceed with your candidacy "
-                "at this time. We will keep your resume on file for future openings.\n\n"
-                "Best regards,\nHR Team"
-            )
-            try:
-                send_mail(subject, message, settings.DEFAULT_FROM_EMAIL, [resume.candidate_email], fail_silently=False)
-                resume.rejection_email_sent = True
-                resume.save()
-            except Exception as e:
-                record_error("automation:email", str(e))
-    # 2. SUCCESS LOGIC
+        # Only update and log if it's a *new* rejection
+        if resume.status != 'AUTO_REJECTED':
+            resume.status = 'AUTO_REJECTED'
+            resume.save()
+            log_activity(resume, 'STATUS_CHANGE', f"Auto-rejected: Score {score_val} < {threshold}")
+
+        # --- EMAIL SENDING DISABLED (COMMENTED OUT) ---
+        # if not resume.rejection_email_sent and resume.candidate_email:
+        #     subject = f"Update regarding your application for {resume_score.job.name}"
+        #     message = (
+        #         f"Dear {resume.candidate_name or 'Candidate'},\n\n"
+        #         f"Thank you for your interest in the {resume_score.job.name} position. "
+        #         "We appreciate the time you took to apply.\n\n"
+        #         "After reviewing your application, we have decided not to proceed with your candidacy "
+        #         "at this time. We will keep your resume on file for future openings.\n\n"
+        #         "Best regards,\nHR Team"
+        #     )
+        #     try:
+        #         send_mail(subject, message, settings.DEFAULT_FROM_EMAIL, [resume.candidate_email], fail_silently=False)
+        #         
+        #         resume.rejection_email_sent = True
+        #         resume.save()
+        #         
+        #         log_activity(resume, 'EMAIL_SENT', "Auto-rejection email sent to candidate.")
+        #         
+        #     except Exception as e:
+        #         record_error("automation:email", str(e))
+        # ----------------------------------------------
+
+    # 2. SUCCESS LOGIC (Qualified)
     else:
-        if resume.status != 'NEW':
+        # Only move to NEW if it is currently PENDING.
+        if resume.status == 'PENDING':
             resume.status = 'NEW'
             resume.save()
+            log_activity(resume, 'STATUS_CHANGE', f"Qualified as NEW (Score: {score_val})")

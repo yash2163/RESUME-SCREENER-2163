@@ -33,6 +33,7 @@ from .forms import (
 )
 
 from django.views.decorators.http import require_POST
+from django.contrib.auth.decorators import login_required
 
 from .models import ChatMessage, ChatSession, ErrorLog, JobDescription, Resume, ResumeScore
 from .services import (
@@ -47,6 +48,8 @@ from .services import (
 
 from django.conf import settings
 logger = logging.getLogger(__name__)
+
+from .utils import log_activity
 
 
 def remember_me_login(request):
@@ -321,17 +324,64 @@ def rescore_single_score(request, score_id):
 #         },
 #     )
 
+# This will only move the profile to shortlisted but we cannot undo it if we click the button again.
+# @login_required  # <--- 1. Safety First
+# @require_POST
+# def shortlist_candidate(request, pk):
+#     resume = get_object_or_404(Resume, pk=pk)
+    
+#     # Update status to SHORTLISTED
+#     resume.status = 'SHORTLISTED'
+#     resume.save()
+    
+#     # 2. Correct Logging Format: (Resume, Action_Type, Details, User)
+#     log_activity(
+#         resume, 
+#         'STATUS_CHANGE', 
+#         "Shortlisted for interview", 
+#         user=request.user
+#     )
+    
+#     return JsonResponse({'status': 'success', 'message': 'Candidate shortlisted'})
 
+# updated logic for shortlisting candidate, now we can make them back to not shortlist too.
+# jobs/views.py
+
+@login_required
 @require_POST
 def shortlist_candidate(request, pk):
     resume = get_object_or_404(Resume, pk=pk)
     
-    # Update status to SHORTLISTED
-    resume.status = 'SHORTLISTED'
+    # Toggle Logic
+    if resume.status == 'SHORTLISTED':
+        # Revert to NEW
+        resume.status = 'NEW'
+        log_message = "Removed from shortlist (Moved to New)"
+        is_shortlisted = False
+    else:
+        # Move to SHORTLISTED
+        resume.status = 'SHORTLISTED'
+        log_message = "Shortlisted for interview"
+        is_shortlisted = True
+    
     resume.save()
     
-    # Return success (HTMX or standard JS will handle the UI update)
-    return JsonResponse({'status': 'success', 'message': 'Candidate shortlisted'})
+    log_activity(
+        resume, 
+        'STATUS_CHANGE', 
+        log_message, 
+        user=request.user
+    )
+    
+    return JsonResponse({
+        'status': 'success', 
+        'message': log_message,
+        'is_shortlisted': is_shortlisted,
+        'new_state': resume.status
+    })
+
+
+
 
 # import json
 
@@ -347,6 +397,7 @@ def update_human_score(request, pk):
         resume.human_score_breakdown = breakdown
         resume.human_score = total_score
         resume.save()
+        log_activity(resume, 'RATED', f"Manager Score: {total_score}", user=request.user)
         
         return JsonResponse({'status': 'success'})
     except Exception as e:
@@ -578,11 +629,11 @@ def dashboard(request):
 
     elif current_tab == "interviews":
         # Show candidates in the interview loop
-        scores = scores.filter(resume__status__in=['INTERVIEW_SCHEDULED', 'INTERVIEW_PASSED', 'INTERVIEW_REJECTED'])
+        scores = scores.filter(resume__status__in=['INTERVIEW_SCHEDULED', 'INTERVIEW_PASSED'])
     
     elif current_tab == "rejected":
         # Show auto-rejected or manually rejected
-        scores = scores.filter(resume__status__in=['AUTO_REJECTED', 'REJECTED'])
+        scores = scores.filter(resume__status__in=['AUTO_REJECTED', 'REJECTED',  'INTERVIEW_REJECTED'])
         
     elif current_tab == "hired":
         # Show hired candidates
@@ -817,24 +868,57 @@ def upload_resumes(request):
     )
 
 
+# @login_required
+# def toggle_resume_flag(request, resume_id):
+#     if request.method != "POST":
+#         return HttpResponseBadRequest("Invalid method")
+#     field = request.POST.get("field")
+#     value_raw = request.POST.get("value")
+#     if field not in ("is_favorite",):
+#         return HttpResponseBadRequest("Unsupported flag")
+#     resume = get_object_or_404(Resume, pk=resume_id)
+#     value = str(value_raw).lower() in ("true", "1", "yes", "on")
+#     setattr(resume, field, value)
+#     resume.save(update_fields=[field])
+#     payload = {"success": True, "field": field, "value": value}
+#     if request.headers.get("x-requested-with") == "XMLHttpRequest":
+#         return JsonResponse(payload)
+#     messages.success(request, f"Updated {field.replace('_', ' ')} for {resume.attachment_name}.")
+#     return redirect(request.META.get("HTTP_REFERER", reverse("dashboard")))
+
+# jobs/views.py
+
+from .utils import log_activity  # <--- Ensure this is imported
+
 @login_required
 def toggle_resume_flag(request, resume_id):
     if request.method != "POST":
         return HttpResponseBadRequest("Invalid method")
+    
     field = request.POST.get("field")
     value_raw = request.POST.get("value")
+    
     if field not in ("is_favorite",):
         return HttpResponseBadRequest("Unsupported flag")
+    
     resume = get_object_or_404(Resume, pk=resume_id)
     value = str(value_raw).lower() in ("true", "1", "yes", "on")
+    
     setattr(resume, field, value)
     resume.save(update_fields=[field])
+
+    # --- ADDED LOGGING HERE ---
+    if field == "is_favorite":
+        action = 'FAVORITE' if value else 'UNFAVORITE'
+        log_activity(resume, action, user=request.user)
+    # --------------------------
+
     payload = {"success": True, "field": field, "value": value}
     if request.headers.get("x-requested-with") == "XMLHttpRequest":
         return JsonResponse(payload)
+        
     messages.success(request, f"Updated {field.replace('_', ' ')} for {resume.attachment_name}.")
     return redirect(request.META.get("HTTP_REFERER", reverse("dashboard")))
-
 
 def _get_or_create_chat_session(request, job_id=None) -> ChatSession:
     session_key = request.session.get("chat_session_key")
@@ -949,46 +1033,123 @@ def resolve_error(request, log_id):
     return redirect(reverse("error_log"))
 
 
+# jobs/views.py
+
+# @login_required
+# @require_POST
+# def schedule_interview(request, score_id):
+#     score = get_object_or_404(ResumeScore, pk=score_id)
+#     resume = score.resume
+    
+#     # 1. Get Logistics
+#     date_str = request.POST.get('interview_date')
+#     link = request.POST.get('interview_link')
+    
+#     # 2. Get Email Content (Edited by user)
+#     email_subject = request.POST.get('email_subject', f"Interview Invitation: {score.job.name}")
+#     email_body = request.POST.get('email_body', '')
+
+#     # 3. Update Resume DB
+#     if date_str:
+#         resume.interview_date = parse_datetime(date_str)
+#     resume.interview_link = link
+#     # We save the email body as the 'notes' so we have a record of what was sent
+#     resume.recruiter_notes = email_body 
+    
+#     resume.status = 'INTERVIEW_SCHEDULED'
+#     resume.save()
+
+#     # 4. Send the User-Edited Email
+#     try:
+#         send_mail(
+#             email_subject, 
+#             email_body, 
+#             settings.DEFAULT_FROM_EMAIL, 
+#             [resume.candidate_email], 
+#             fail_silently=False
+#         )
+#         resume.interview_email_sent = True
+#         resume.save()
+#         messages.success(request, f"Interview scheduled and invite sent to {resume.candidate_name}.")
+#         log_activity(resume, 'EMAIL_SENT', f"Subject: {email_subject}", user=request.user)
+#         log_activity(resume, 'STATUS_CHANGE', "Moved to Interview Scheduled", user=request.user)
+#     except Exception as e:
+#         messages.warning(request, f"Interview set, but email failed: {e}")
+
+#     return redirect('dashboard')
+
+
+@login_required
 @require_POST
 def schedule_interview(request, score_id):
     score = get_object_or_404(ResumeScore, pk=score_id)
     resume = score.resume
     
-    # Get form data
-    date_str = request.POST.get('interview_date') # Format: YYYY-MM-DDTHH:MM
+    # 1. Get Logistics
+    date_str = request.POST.get('interview_date')
     link = request.POST.get('interview_link')
-    notes = request.POST.get('message_notes')
+    
+    # 2. Get Email Content (Edited by user)
+    email_subject = request.POST.get('email_subject', f"Interview Invitation: {score.job.name}")
+    email_body = request.POST.get('email_body', '')
 
+    # 3. Update Resume DB
     if date_str:
         resume.interview_date = parse_datetime(date_str)
-    
     resume.interview_link = link
+    resume.recruiter_notes = email_body 
+    
     resume.status = 'INTERVIEW_SCHEDULED'
     resume.save()
 
-    # Send Email
-    if resume.candidate_email:
-        subject = f"Interview Invitation: {score.job.name} at Minfy"
-        message = (
-            f"Dear {resume.candidate_name},\n\n"
-            f"We reviewed your application for {score.job.name} and would like to invite you for an interview.\n\n"
-            f"Time: {date_str.replace('T', ' ')}\n"
-            f"Location/Link: {link}\n\n"
-            f"Notes: {notes}\n\n"
-            "Please reply to confirm your availability.\n\n"
-            "Best,\nMinfy HR Team"
-        )
+    # 4. Email Logic (DISABLED FOR NOW)
+    # Change 'if False:' to 'if True:' when you are ready to send real emails.
+    if False:
         try:
-            send_mail(subject, message, settings.DEFAULT_FROM_EMAIL, [resume.candidate_email])
+            send_mail(
+                email_subject, 
+                email_body, 
+                settings.DEFAULT_FROM_EMAIL, 
+                [resume.candidate_email], 
+                fail_silently=False
+            )
             resume.interview_email_sent = True
             resume.save()
-            messages.success(request, f"Interview invite sent to {resume.candidate_name}")
+            log_activity(resume, 'EMAIL_SENT', f"Subject: {email_subject}", user=request.user)
+            messages.success(request, f"Interview scheduled and invite sent to {resume.candidate_name}.")
         except Exception as e:
-            messages.error(request, f"Failed to send email: {e}")
-    
+            messages.warning(request, f"Interview set, but email failed: {e}")
+            log_activity(resume, 'STATUS_CHANGE', "Interview set (Email Failed)", user=request.user)
+    else:
+        # Log that we scheduled it without sending the email
+        log_activity(resume, 'STATUS_CHANGE', "Interview scheduled (Email disabled)", user=request.user)
+        messages.success(request, f"Interview scheduled for {resume.candidate_name} (No email sent).")
+
     return redirect('dashboard')
 
-# jobs/views.py
+
+
+@require_POST
+@login_required
+def update_status(request, score_id):
+    score = get_object_or_404(ResumeScore, pk=score_id)
+    resume = score.resume
+    action = request.POST.get('action')
+
+    if action == 'hire':
+        resume.status = 'HIRED'
+        log_activity(resume, 'STATUS_CHANGE', "Marked as HIRED 🎉", user=request.user)
+        messages.success(request, f"🎉 {resume.candidate_name} marked as HIRED!")
+
+    elif action == 'reject':
+        # Used for post-interview rejection
+        resume.status = 'INTERVIEW_REJECTED'
+        log_activity(resume, 'STATUS_CHANGE', "Rejected after interview", user=request.user)
+        messages.info(request, f"{resume.candidate_name} marked as Rejected.")
+
+    resume.save()
+    return redirect(request.META.get('HTTP_REFERER', 'dashboard'))
+
 
 @require_POST
 @login_required
@@ -1003,15 +1164,31 @@ def update_status(request, score_id):
     if action == 'hire':
         resume.status = 'HIRED'
         messages.success(request, f"🎉 {resume.candidate_name} marked as HIRED!")
+        
+        # --- LOGGING ---
+        log_activity(
+            resume, 
+            'STATUS_CHANGE', 
+            "Marked as HIRED 🎉", 
+            user=request.user
+        )
+
     elif action == 'reject':
         resume.status = 'INTERVIEW_REJECTED' # Specific status for post-interview rejection
         messages.info(request, f"{resume.candidate_name} marked as Rejected.")
+        
+        # --- LOGGING ---
+        log_activity(
+            resume, 
+            'STATUS_CHANGE', 
+            "Rejected after interview", 
+            user=request.user
+        )
     
     resume.save()
     
     # Refresh the page (stay on current tab)
     return redirect(request.META.get('HTTP_REFERER', 'dashboard'))
-
 
 
 # jobs/views.py
@@ -1044,9 +1221,14 @@ def update_human_score(request, pk):
                 resume.human_score = round(total_avg, 1)
                 resume.human_score_breakdown = breakdown
                 resume.save()
+                log_activity(resume, 'RE-RATED', f"Manager Score: {total_avg}", user=request.user)
+                
                 return JsonResponse({'status': 'success'})
         
         return JsonResponse({'status': 'error', 'message': 'No valid scores provided'})
 
     except Exception as e:
         return JsonResponse({'status': 'error', 'message': str(e)}, status=400)
+    
+
+

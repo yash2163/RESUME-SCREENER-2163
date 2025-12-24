@@ -10,8 +10,8 @@
     </div>
 </div>
 {% for job in jobs %}
-    <article class="card">
-        <header class="grid">
+    <article class="card", style="background-color: #ffffff;">
+        <header class="grid", style="background-color: #ffffff;">
             <div>
                 <h4>{{ job.name }}</h4>
             </div>
@@ -34,8 +34,8 @@
         </header>
         <div>
             <strong>Qualification Criteria</strong>
-            <div style="max-height:200px; overflow:auto; border:1px solid #eee; padding:.5rem; border-radius:6px;">
-                <ul>
+            <div style="max-height:350px; overflow:auto; border:1px solid #eee; padding:.5rem; border-radius:6px; ">
+                <ul style="color: black;">
                     {% for c in job.criteria.all %}
                         <li>{{ c.detail|linebreaksbr }}</li>
                     {% empty %}

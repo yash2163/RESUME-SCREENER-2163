@@ -154,3 +154,33 @@ class ErrorLog(models.Model):
 
     def __str__(self) -> str:
         return f"{self.location}: {self.message[:50]}"
+
+
+# jobs/models.py
+
+from django.conf import settings
+
+class ResumeActivityLog(models.Model):
+    ACTION_CHOICES = [
+        ('INGESTED', 'Resume Ingested'),
+        ('SCORED', 'AI Scored'),
+        ('RESCORED', 'Rescored'),
+        ('STATUS_CHANGE', 'Status Changed'),
+        ('EMAIL_SENT', 'Email Sent'),
+        ('NOTE_ADDED', 'Note Added'),
+        ('FAVORITE', 'Marked as Favorite'),
+        ('UNFAVORITE', 'Unmarked Favorite'),
+        ('RATED', 'Manager Rated'),
+    ]
+
+    resume = models.ForeignKey(Resume, on_delete=models.CASCADE, related_name='logs')
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True)
+    action_type = models.CharField(max_length=20, choices=ACTION_CHOICES)
+    details = models.TextField(blank=True, null=True)  # E.g., "Score: 85" or "Subject: Interview Invite"
+    timestamp = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-timestamp']
+
+    def __str__(self):
+        return f"{self.get_action_type_display()} - {self.resume.candidate_name}"

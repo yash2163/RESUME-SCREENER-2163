@@ -16,7 +16,7 @@
         <legend>Qualification Criteria (rich text, include scoring conditions)</legend>
         {{ formset.management_form }}
         {% for form in formset %}
-            <article class="card">
+            <article class="card" style="background-color:#f9f9f9;">
                 {{ form.id }}
                 <label>Detail (all scoring/conditions) {{ form.detail }}</label>
                 {% if form.instance.pk %}

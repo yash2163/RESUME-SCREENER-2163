@@ -1,0 +1,6 @@
+# Create a .gcloudignore file that excludes junk but INCLUDES your key
+echo ".git" > .gcloudignore
+echo ".gitignore" >> .gcloudignore
+echo "venv/" >> .gcloudignore
+echo "__pycache__/" >> .gcloudignore
+echo "!credentials.json" >> .gcloudignore

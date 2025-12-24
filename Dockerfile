@@ -12,5 +12,11 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 COPY . /code/
 
+# Add this line exactly here:
+COPY credentials.json /app/credentials.json
+
+# Generate static files during build
+RUN python manage.py collectstatic --noinput
+
 # Respect Cloud Run $PORT (default to 8000 locally) and serve via gunicorn
 CMD ["bash", "-c", "PORT=${PORT:-8000} gunicorn hr_analyst.wsgi:application --bind 0.0.0.0:$PORT"]

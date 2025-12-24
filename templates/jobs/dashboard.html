@@ -1,12 +1,16 @@
 {% extends "base.html" %}
 {% load static %}
 
-{% block extra_css %}
-<link rel="stylesheet" href="{% static 'jobs/styles/score_cards.css' %}">
-<link rel="stylesheet" href="{% static 'jobs/styles/score_rows.css' %}">
-{% endblock %}
+<!-- {% block extra_css %}
+    <link rel="stylesheet" href="{% static 'css/score_cards.css' %}">
+    <link rel="stylesheet" href="{% static 'css/score_rows.css' %}">
+{% endblock %} -->
+
+
 
 {% block content %}
+
+<!-- <input type="hidden" id="global-csrf" name="csrfmiddlewaretoken" value="{{ csrf_token }}"> -->
 
 <div class="dashboard-tabs">
     <a href="?tab=inbox" class="tab-link {% if current_tab == 'inbox' %}active{% endif %}">Inbox</a>
@@ -158,7 +162,7 @@
         <p id="rateModalSub" style="margin:5px 0 0; font-size:0.85rem; color:#64748b;">Rate Candidate</p>
     </div>
     
-    <form id="humanRateForm" method="post" style="padding: 20px; max-height: 70vh; overflow-y: auto;">
+    <form id="humanRateForm" method="post" style="padding: 20px; max-height: 70vh; overflow-y: auto; opacity: 1; background-color: #ffffff;">
         <div id="criteriaInputs"></div>
 
         <div class="modal-actions" style="margin-top:20px; display:flex; justify-content:flex-end; gap:10px;">
@@ -174,7 +178,7 @@
     </form>
 </dialog>
 
-<dialog id="scheduleModal" style="border:none; border-radius:12px; padding:0; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1); width: 450px; max-width:90vw;">
+<!-- <dialog id="scheduleModal" style="border:none; border-radius:12px; padding:0; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1); width: 450px; max-width:90vw;">
     <div class="modal-header" style="background:#f8fafc; padding:15px 20px; border-bottom:1px solid #e2e8f0;">
         <h3 style="margin:0; font-size:1.1rem; color:#1e293b;">Schedule Interview</h3>
         <p id="modalSub" style="margin:5px 0 0; font-size:0.85rem; color:#64748b;">Candidate Name</p>
@@ -212,7 +216,146 @@
             </button>
         </div>
     </form>
+</dialog> -->
+
+
+<dialog id="scheduleModal" style="border:none; border-radius:12px; padding:0; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1); width: 600px; max-width:95vw;">
+    <div class="modal-header" style="background:#f8fafc; padding:15px 20px; border-bottom:1px solid #e2e8f0;">
+        <h3 style="margin:0; font-size:1.1rem; color:#1e293b;">Schedule Interview</h3>
+        <p id="modalSub" style="margin:5px 0 0; font-size:0.85rem; color:#64748b;">Candidate Name</p>
+    </div>
+    
+    <form id="scheduleForm" method="post" style="padding: 20px; display: flex; flex-direction: column; gap: 20px;">
+        {% csrf_token %}
+        
+        <input type="hidden" id="candidateNameHidden">
+        <input type="hidden" id="jobNameHidden">
+
+        <div style="display:grid; grid-template-columns: 1fr 1fr; gap:15px;">
+            <div>
+                <label style="display:block; font-size:0.85rem; font-weight:600; color:#475569; margin-bottom:5px;">Date & Time</label>
+                <input type="datetime-local" id="interview_date" name="interview_date" required
+                       oninput="updateEmailDraft()"
+                       style="width:100%; padding:8px; border:1px solid #cbd5e1; border-radius:6px;">
+            </div>
+            <div>
+                <label style="display:block; font-size:0.85rem; font-weight:600; color:#475569; margin-bottom:5px;">Link / Location</label>
+                <input type="text" id="interview_link" name="interview_link" placeholder="e.g. Google Meet" required
+                       oninput="updateEmailDraft()"
+                       style="width:100%; padding:8px; border:1px solid #cbd5e1; border-radius:6px;">
+            </div>
+        </div>
+
+        <hr style="border:0; border-top:1px solid #e2e8f0; margin:0;">
+
+        <div>
+            <label style="display:block; font-size:0.85rem; font-weight:600; color:#475569; margin-bottom:8px;">
+                <i class="bi bi-envelope"></i> Email Preview (You can edit this)
+            </label>
+            
+            <input type="text" id="email_subject" name="email_subject" placeholder="Subject Line"
+                   style="width:100%; padding:8px; border:1px solid #cbd5e1; border-radius:6px; margin-bottom:10px; font-weight:600; color:#334155;">
+            
+            <textarea id="email_body" name="email_body" rows="8" 
+                      style="width:100%; padding:10px; border:1px solid #cbd5e1; border-radius:6px; font-family:sans-serif; line-height:1.5; font-size:0.9rem; color:#334155;"></textarea>
+        </div>
+
+        <div class="modal-actions" style="margin-top:0px; display:flex; justify-content:flex-end; gap:10px;">
+            <button type="button" class="btn-cancel" onclick="document.getElementById('scheduleModal').close()"
+                    style="padding:8px 16px; border:1px solid #cbd5e1; background:white; border-radius:6px; cursor:pointer;">
+                Cancel
+            </button>
+            <button type="submit" class="btn-submit"
+                    style="padding:8px 16px; border:none; background:#2563eb; color:white; border-radius:6px; cursor:pointer;">
+                <i class="bi bi-send-fill"></i> Send Invitation
+            </button>
+        </div>
+    </form>
 </dialog>
+
+<script>
+// Track if user has manually edited the body to stop auto-overwrite
+let isManualEdit = false;
+
+function openScheduleModal(scoreId, name, job) {
+    const modal = document.getElementById('scheduleModal');
+    const form = document.getElementById('scheduleForm');
+    const sub = document.getElementById('modalSub');
+    
+    // Store data for the generator
+    document.getElementById('candidateNameHidden').value = name;
+    document.getElementById('jobNameHidden').value = job;
+    
+    // Reset inputs
+    isManualEdit = false;
+    document.getElementById('interview_date').value = '';
+    document.getElementById('interview_link').value = '';
+
+    if (!modal || !form) return;
+
+    // Update Form Action & UI
+    form.action = `/schedule/${scoreId}/`;
+    if (sub) sub.innerText = `For ${name} (${job})`;
+    
+    // Trigger initial draft
+    updateEmailDraft();
+    
+    modal.showModal();
+}
+
+function updateEmailDraft() {
+    // If user manually edited the text, don't overwrite it automatically
+    if (isManualEdit) return;
+
+    const name = document.getElementById('candidateNameHidden').value;
+    const job = document.getElementById('jobNameHidden').value;
+    const dateVal = document.getElementById('interview_date').value;
+    const link = document.getElementById('interview_link').value;
+
+    // Format Date nicely (if present)
+    let dateStr = "[Date & Time]";
+    if (dateVal) {
+        const d = new Date(dateVal);
+        dateStr = d.toLocaleString('en-US', { dateStyle: 'full', timeStyle: 'short' });
+    }
+
+    const subject = `Interview Invitation: ${job}`;
+    const body = `Dear ${name},
+
+We reviewed your application for the ${job} position and were impressed with your profile. We would like to invite you for an interview to discuss your experience further.
+
+Details:
+Date: ${dateStr}
+Location/Link: ${link || "[Link]"}
+
+Please let us know if this time works for you.
+
+Best regards,
+Hiring Team`;
+
+    document.getElementById('email_subject').value = subject;
+    document.getElementById('email_body').value = body;
+}
+
+// Mark as manual edit once user types in the textarea
+document.getElementById('email_body').addEventListener('input', () => {
+    isManualEdit = true;
+});
+
+// Close Modal Logic
+document.addEventListener("DOMContentLoaded", () => {
+    const schedModal = document.getElementById('scheduleModal');
+    if (schedModal) {
+        schedModal.addEventListener('click', (event) => {
+            if (event.target === schedModal) {
+                schedModal.close();
+            }
+        });
+    }
+});
+</script>
+
+
 
 <script>
 // ----------------------------------------
@@ -276,42 +419,111 @@ function openHumanRateModal(resumeId, name, criteriaList, existingScores) {
 }
 
 // B. Shortlist Candidate Function
+// async function shortlistCandidate(resumeId, btnElement) {
+//     if (!confirm("Move this candidate to Shortlisted?")) return;
+
+//     try {
+//         const originalContent = btnElement.innerHTML;
+//         btnElement.innerHTML = '<div class="loading-spinner" style="width:12px; height:12px;"></div>';
+//         btnElement.disabled = true;
+
+//         const csrfToken = document.getElementById('csrf-token')?.value;
+
+//         const response = await fetch(`/shortlist/${resumeId}/`, {
+//             method: 'POST',
+//             headers: {
+//                 'X-CSRFToken': csrfToken,
+//                 'Content-Type': 'application/json'
+//             }
+//         });
+
+//         if (response.ok) {
+//             const card = btnElement.closest('.score-card') || btnElement.closest('.score-row');
+//             if (card) {
+//                 card.style.transition = "opacity 0.5s, transform 0.5s";
+//                 card.style.opacity = "0";
+//                 card.style.transform = "translateX(20px)";
+//                 setTimeout(() => card.remove(), 500); 
+//             }
+//         } else {
+//             alert("Error updating status.");
+//             btnElement.innerHTML = originalContent;
+//             btnElement.disabled = false;
+//         }
+//     } catch (error) {
+//         console.error('Error:', error);
+//         alert("Something went wrong.");
+//     }
+// }
+
+
+// B. Shortlist Candidate Function (Toggle Version)
 async function shortlistCandidate(resumeId, btnElement) {
-    if (!confirm("Move this candidate to Shortlisted?")) return;
+    // 1. Get CSRF Token
+    const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]')?.value || 
+                      document.getElementById('csrf-token')?.value;
+
+    // 2. Optimistic UI (Optional: Add spinner or just wait)
+    const icon = btnElement.querySelector("i");
+    const originalIconClass = icon.className;
+    
+    // Add a tiny spinner to the button temporarily
+    icon.className = "spinner-border spinner-border-sm"; 
+    btnElement.disabled = true;
 
     try {
-        const originalContent = btnElement.innerHTML;
-        btnElement.innerHTML = '<div class="loading-spinner" style="width:12px; height:12px;"></div>';
-        btnElement.disabled = true;
-
-        const csrfToken = document.getElementById('csrf-token')?.value;
-
         const response = await fetch(`/shortlist/${resumeId}/`, {
             method: 'POST',
             headers: {
                 'X-CSRFToken': csrfToken,
-                'Content-Type': 'application/json'
+                'Content-Type': 'application/json',
+                'X-Requested-With': 'XMLHttpRequest'
             }
         });
 
         if (response.ok) {
-            const card = btnElement.closest('.score-card') || btnElement.closest('.score-row');
-            if (card) {
-                card.style.transition = "opacity 0.5s, transform 0.5s";
-                card.style.opacity = "0";
-                card.style.transform = "translateX(20px)";
-                setTimeout(() => card.remove(), 500); 
+            const data = await response.json();
+            
+            // 3. Update Button UI based on new state
+            if (data.is_shortlisted) {
+                // State: SHORTLISTED (Dark Green)
+                btnElement.title = "Remove from Shortlist";
+                btnElement.dataset.status = "SHORTLISTED";
+                
+                // Update Styles
+                btnElement.style.color = "#ffffff";
+                btnElement.style.background = "#059669";
+                btnElement.style.borderColor = "#047857";
+                
+                // Update Icon
+                icon.className = "bi bi-check-circle-fill";
+            } else {
+                // State: NEW (Light Green)
+                btnElement.title = "Shortlist Candidate";
+                btnElement.dataset.status = "NEW";
+                
+                // Update Styles
+                btnElement.style.color = "#059669";
+                btnElement.style.background = "#ecfdf5";
+                btnElement.style.borderColor = "#a7f3d0";
+                
+                // Update Icon
+                icon.className = "bi bi-check-circle";
             }
         } else {
+            console.error("Server error");
             alert("Error updating status.");
-            btnElement.innerHTML = originalContent;
-            btnElement.disabled = false;
+            icon.className = originalIconClass; // Revert icon
         }
     } catch (error) {
         console.error('Error:', error);
         alert("Something went wrong.");
+        icon.className = originalIconClass; // Revert icon
+    } finally {
+        btnElement.disabled = false;
     }
 }
+
 
 // C. Open Schedule Modal Function
 function openScheduleModal(scoreId, name, job) {
@@ -337,6 +549,15 @@ document.addEventListener("DOMContentLoaded", () => {
     
     // A. Human Rate Form Submit Listener
     const rateForm = document.getElementById('humanRateForm');
+    const rateModal = document.getElementById('humanRateModal');
+    window.onclick = function(event) {
+        if (event.target === schedModal) {
+            schedModal.close();
+        }
+        if (event.target === rateModal) { // Add this check
+            rateModal.close();
+        }
+    }
     if(rateForm) {
         rateForm.addEventListener('submit', async (e) => {
             e.preventDefault();
@@ -592,5 +813,6 @@ document.addEventListener("DOMContentLoaded", () => {
         }
     });
 });
+
 </script>
 {% endblock %}

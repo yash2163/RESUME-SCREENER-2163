@@ -4,17 +4,20 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>HR Analyst</title>
+    
+    {% load static %}
+
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
-    <link
-      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap"
-      rel="stylesheet"
-    />
-    <link
-      rel="stylesheet"
-      href="https://cdn.jsdelivr.net/npm/@picocss/pico@1.5.11/css/pico.min.css"
-    />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@1.5.11/css/pico.min.css" />
+
+    <!-- <link rel="stylesheet" href="{% static 'jobs/style.css' %}"> -->
+
+    {% block extra_css %}{% endblock %}
+
+
 
 
 
@@ -757,9 +760,9 @@
       Score-CARD CONTAINER
       ========================================= */
 
-      .score-card{
+      /* .score-card{
         background-color: #ffffff;
-      }
+      } */
 
       .card {
           /* background: #ff1919; */
@@ -1174,6 +1177,86 @@
         font-weight: 600;
     }
 
+
+
+
+
+
+
+
+
+
+    /* --- Activity Log Styling --- */
+
+    .activity-log-container {
+        background-color: #f8fafc;
+        border: 1px solid #e2e8f0;
+        border-radius: 8px;
+        padding: 12px;
+        margin-top: 10px;
+        max-height: 160px;
+        overflow-y: auto;
+    }
+
+    /* Custom Scrollbar for the log (Webkit only) */
+    .activity-log-container::-webkit-scrollbar {
+        width: 4px;
+    }
+    .activity-log-container::-webkit-scrollbar-track {
+        background: transparent;
+    }
+    .activity-log-container::-webkit-scrollbar-thumb {
+        background: #cbd5e1;
+        border-radius: 4px;
+    }
+
+    .log-entry {
+        display: flex;
+        gap: 12px;
+        padding-bottom: 8px;
+        margin-bottom: 8px;
+        border-bottom: 1px dashed #e2e8f0;
+    }
+
+    .log-entry:last-child {
+        border-bottom: none;
+        margin-bottom: 0;
+        padding-bottom: 0;
+    }
+
+    .log-time {
+        min-width: 65px;
+        font-size: 0.7rem;
+        color: #94a3b8;
+        font-variant-numeric: tabular-nums; /* Keeps numbers aligned */
+        padding-top: 2px; /* Align with text */
+    }
+
+    .log-content {
+        flex: 1;
+        font-size: 0.8rem;
+        line-height: 1.4;
+    }
+
+    .log-title {
+        font-weight: 600;
+        color: #334155;
+        display: block;
+    }
+
+    .log-user {
+        font-weight: 400;
+        color: #64748b;
+        font-size: 0.75rem;
+        margin-left: 4px;
+    }
+
+    .log-details {
+        color: #475569;
+        font-size: 0.8rem;
+        margin-top: 2px;
+    }
+
     </style>  
 
 
@@ -1199,6 +1282,11 @@
 
 
   </head>
+
+
+
+
+  
   <body>
     <main class="container">
       <header>

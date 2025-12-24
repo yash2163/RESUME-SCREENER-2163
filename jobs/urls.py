@@ -18,7 +18,6 @@ urlpatterns = [
     path("errors/<int:log_id>/resolve/", views.resolve_error, name="resolve_error"),
     path('schedule/<int:score_id>/', views.schedule_interview, name='schedule_interview'),
     path('status/<int:score_id>/', views.update_status, name='update_status'),
-    # path('dashboard/', views.dashboard, name='dashboard'),
     path('shortlist/<int:pk>/', views.shortlist_candidate, name='shortlist_candidate'), # New
     path('rate/<int:pk>/', views.update_human_score, name='update_human_score'),       # New
     path('rate-human/<int:pk>/', views.update_human_score, name='update_human_score'),
