@@ -10,3 +10,11 @@ google-cloud-aiplatform==1.70.0
 pypdf==4.3.1
 google-cloud-storage==2.17.0
 python-docx==1.1.2
+pytesseract
+pdf2image
+python-docx
+pypdf
+pypdf
+python-docx
+pytesseract
+pdf2image

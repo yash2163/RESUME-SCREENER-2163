@@ -86,6 +86,15 @@ AUTH_PASSWORD_VALIDATORS = [
     {"NAME": "django.contrib.auth.password_validation.NumericPasswordValidator"},
 ]
 
+
+# --- INGESTION SETTINGS ---
+# Controls parallel processing for file uploads and AI scoring
+INGEST_MAX_WORKERS = int(os.environ.get("INGEST_MAX_WORKERS", "4"))
+INGEST_SCORE_WORKERS = int(os.environ.get("INGEST_SCORE_WORKERS", "4"))
+
+# --- AUTOMATION SETTINGS ---
+AUTO_REJECTION_THRESHOLD = int(os.environ.get("AUTO_REJECTION_THRESHOLD", "60"))
+
 LANGUAGE_CODE = "en-us"
 TIME_ZONE = "UTC"
 USE_I18N = True

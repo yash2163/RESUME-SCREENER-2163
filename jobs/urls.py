@@ -21,4 +21,5 @@ urlpatterns = [
     path('shortlist/<int:pk>/', views.shortlist_candidate, name='shortlist_candidate'), # New
     path('rate/<int:pk>/', views.update_human_score, name='update_human_score'),       # New
     path('rate-human/<int:pk>/', views.update_human_score, name='update_human_score'),
+    # path("resumes/<int:pk>/", views.resume_detail, name="view_resume"),
 ]

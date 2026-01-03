@@ -240,7 +240,20 @@ modal.addEventListener('click', (event) => {
 
 
 
-<input type="hidden" id="global-csrf" name="csrfmiddlewaretoken" value="{{ csrf_token }}">
+
+
+
+
+
+
+
+
+
+
+
+
+
+<!-- <input type="hidden" id="global-csrf" name="csrfmiddlewaretoken" value="{{ csrf_token }}">
 {% load tz %} 
 {% for score in scores %}
 
@@ -522,6 +535,385 @@ modal.addEventListener('click', (event) => {
                     <td>
                         <span class="table-score {% if item.score >= 75 %}high{% elif item.score < 40 %}low{% endif %}">
                             {{ item.score }}
+                        </span>
+                    </td>
+                    <td class="criteria-notes">{{ item.notes|default:"-" }}</td>
+                </tr>
+                {% empty %}
+                <tr><td colspan="3" style="text-align:center; padding: 20px; color:#94a3b8;">No breakdown data available.</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+  </details>
+
+  <details class="text-details">
+    <summary>
+        <i class="bi bi-file-text"></i> View Resume Content
+    </summary>
+    <div class="resume-content">
+        {{ score.resume.text_content|default:"No text captured." }}
+    </div>
+  </details>
+
+</article>
+{% endfor %} -->
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<input type="hidden" id="global-csrf" name="csrfmiddlewaretoken" value="{{ csrf_token }}">
+{% load tz %} 
+{% for score in scores %}
+
+<article class="score-card {% if score.resume.status == 'AUTO_REJECTED' %}card-faded{% endif %}" 
+         id="card-{{ score.resume.id }}" 
+         style="transition: all 0.3s; {% if score.resume.status == 'AUTO_REJECTED' %}opacity: 0.75; background-color: #f8fafc; border-color: #e2e8f0;{% endif %}">
+  
+  <div class="score-header">
+    
+    <div class="header-left">
+      <h4 class="candidate-name">
+        {{ score.resume.candidate_name|default:"Unknown Candidate" }}
+      </h4>
+
+      {% if score.resume.candidate_role or score.resume.candidate_company %}
+      <div style="font-size: 0.85rem; color: #475569; margin-bottom: 4px; font-weight: 500; line-height: 1.2;">
+        {% if score.resume.candidate_role %}
+            {{ score.resume.candidate_role }}
+        {% endif %}
+        {% if score.resume.candidate_company %}
+            <span style="color: #64748b; font-weight: 400;"> @ {{ score.resume.candidate_company }}</span>
+        {% endif %}
+      </div>
+      {% endif %}
+
+      <div class="job-role">
+        <i class="bi bi-briefcase-fill"></i> 
+        <span>Applied for: <strong>{{ score.job.name }}</strong></span>
+      </div>
+      
+      <div style="margin-top: 6px;">
+          {% if score.resume.status == 'SHORTLISTED' %}
+            <span class="status-tag" style="font-size:0.75rem; background:#f0fdf4; color:#15803d; border:1px solid #bbf7d0; padding:2px 8px; border-radius:12px; font-weight:600;">
+                <i class="bi bi-check2-circle"></i> Shortlisted
+            </span>
+          {% elif score.resume.status == 'INTERVIEW_SCHEDULED' %}
+            <span class="status-tag interview" style="font-size:0.75rem; background:#e0f2fe; color:#0369a1; padding:2px 6px; border-radius:4px; font-weight:600;">
+                <i class="bi bi-calendar-check"></i> Interview Set
+            </span>
+          {% elif score.resume.status == 'AUTO_REJECTED' %}
+            <span class="status-tag rejected" style="font-size:0.75rem; background:#fee2e2; color:#991b1b; padding:2px 6px; border-radius:4px; font-weight:600;">
+                <i class="bi bi-robot"></i> Auto Rejected
+            </span>
+          {% elif score.resume.status == 'INTERVIEW_REJECTED' or score.resume.status == 'REJECTED' %}
+            <span class="status-tag rejected" style="font-size:0.75rem; background:#fee2e2; color:#991b1b; padding:2px 6px; border-radius:4px; font-weight:600;">
+                <i class="bi bi-x-circle"></i> Rejected
+            </span>
+          {% elif score.resume.status == 'HIRED' %}
+            <span class="status-tag hired" style="font-size:0.75rem; background:#dcfce7; color:#166534; padding:2px 6px; border-radius:4px; font-weight:600;">
+                <i class="bi bi-trophy-fill"></i> Hired
+            </span>
+          {% endif %}
+      </div>
+    </div>
+
+    <details class="text-details" style="border-top:1px solid #f1f5f9; padding-top:8px; margin-top:8px;">
+        <summary style="font-size:0.85rem; color:#64748b; cursor:pointer;">
+            <i class="bi bi-clock-history"></i> Activity History
+        </summary>
+        
+        <div class="activity-log-container">
+            {% for log in score.resume.logs.all %}
+            <div class="log-entry">
+                <div class="log-time">
+                    {{ log.timestamp|date:"M d, H:i" }}
+                </div>
+                
+                <div class="log-content">
+                    <span class="log-title">
+                        {{ log.get_action_type_display }}
+                        {% if log.user %}
+                            <span class="log-user">by {{ log.user.username }}</span>
+                        {% endif %}
+                    </span>
+                    
+                    {% if log.details %}
+                    <div class="log-details">
+                        {{ log.details }}
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+            {% empty %}
+            <div style="text-align:center; color:#94a3b8; font-size:0.8rem; font-style:italic; padding:10px;">
+                No history recorded yet.
+            </div>
+            {% endfor %}
+        </div>
+    </details>
+
+    <div class="header-right">
+        
+        <div style="display:flex; flex-direction:column; align-items:flex-end; gap:6px; margin-bottom: 10px;">
+            
+            <div class="score-pill {% if score.total_score|floatformat:0 >= 75 %}score-success{% elif score.total_score|floatformat:0 < 40 %}score-danger{% endif %}">
+                <span style="font-size:0.7rem; text-transform:uppercase; opacity:0.7; margin-right:4px;">AI</span>
+                <span class="score-value">{{ score.total_score|floatformat:1 }}</span>
+                <span class="score-label">/ 100</span>
+            </div>
+
+            {% if score.resume.human_score is not None %}
+                <div class="score-pill" 
+                     style="background:#eff6ff; color:#1d4ed8; border:1px solid #dbeafe; cursor:pointer;"
+                     title="Click to edit score"
+                     onclick="openHumanRateModal(
+                        {{ score.resume.id }}, 
+                        '{{ score.resume.candidate_name|escapejs }}', 
+                        [
+                          {% for item in score.detail %}
+                            { &quot;title&quot;: &quot;{{ item.title|escapejs }}&quot;, &quot;score&quot;: {{ item.score|default:0 }} }
+                            {% if not forloop.last %},{% endif %}
+                          {% empty %}
+                            { &quot;title&quot;: &quot;Overall Fit&quot;, &quot;score&quot;: 0 }
+                          {% endfor %}
+                        ],
+                        {
+                          {% for k,v in score.resume.human_score_breakdown.items %}
+                            &quot;{{ k|escapejs }}&quot;: {{ v|default:0 }}
+                            {% if not forloop.last %},{% endif %}
+                          {% endfor %}
+                        }
+                    )">
+                    <span style="font-size:0.7rem; text-transform:uppercase; opacity:0.7; margin-right:4px;">Human</span>
+                    <span class="score-value">{{ score.resume.human_score|floatformat:1 }}</span>
+                    <span class="score-label">/ 100</span>
+                    <i class="bi bi-pencil-fill" style="font-size:0.6rem; margin-left:4px; opacity:0.5;"></i>
+                </div>
+            {% else %}
+                <div class="score-pill" 
+                     style="background:#f8fafc; color:#64748b; border:1px dashed #cbd5e1; cursor:pointer;"
+                     title="Click to rate"
+                     onclick="openHumanRateModal(
+                        {{ score.resume.id }}, 
+                        '{{ score.resume.candidate_name|escapejs }}', 
+                        [
+                          {% for item in score.detail %}
+                            { &quot;title&quot;: &quot;{{ item.title|escapejs }}&quot;, &quot;score&quot;: {{ item.score|default:0 }} }
+                            {% if not forloop.last %},{% endif %}
+                          {% empty %}
+                            { &quot;title&quot;: &quot;Overall Fit&quot;, &quot;score&quot;: 0 }
+                          {% endfor %}
+                        ],
+                        {}
+                    )">
+                    <i class="bi bi-plus-circle" style="margin-right:4px;"></i>
+                    <span style="font-size:0.75rem; font-weight:600;">Give Score</span>
+                </div>
+            {% endif %}
+        </div>
+
+        <div class="action-row">
+
+            {% if score.resume.linkedin_profile %}
+            <a class="icon-btn" 
+            href="{% if 'http' not in score.resume.linkedin_profile %}https://{% endif %}{{ score.resume.linkedin_profile }}" 
+            target="_blank" 
+            title="LinkedIn Profile" 
+            style="color: #0077b5; background: #f0f9ff; border-color: #bae6fd;">
+                <i class="bi bi-linkedin"></i>
+            </a>
+            {% endif %}
+    
+            {% if score.resume.signed_url %}
+            <a class="icon-btn" href="{{ score.resume.signed_url }}" target="_blank" title="Download CV">
+                <i class="bi bi-download"></i>
+            </a>
+            {% elif score.resume.file_url %}
+            <a class="icon-btn" href="{{ score.resume.file_url }}" target="_blank" title="Download CV">
+                <i class="bi bi-download"></i>
+            </a>
+            {% endif %}
+
+            {% if score.resume.candidate_email %}
+            <a class="icon-btn" href="mailto:{{ score.resume.candidate_email }}" title="Email Candidate">
+                <i class="bi bi-envelope"></i>
+            </a>
+            {% endif %}
+
+            <button class="icon-btn" title="Manager Rating"
+                onclick="openHumanRateModal(
+                    {{ score.resume.id }}, 
+                    '{{ score.resume.candidate_name|escapejs }}', 
+                    [
+                    {% for item in score.detail %}
+                        { &quot;title&quot;: &quot;{{ item.title|escapejs }}&quot;, &quot;score&quot;: {{ item.score|default:0 }} }
+                        {% if not forloop.last %},{% endif %}
+                    {% empty %}
+                        { &quot;title&quot;: &quot;Overall Fit&quot;, &quot;score&quot;: 0 }
+                    {% endfor %}
+                    ],
+                    {
+                    {% for k,v in score.resume.human_score_breakdown.items %}
+                        &quot;{{ k|escapejs }}&quot;: {{ v|default:0 }}
+                        {% if not forloop.last %},{% endif %}
+                    {% endfor %}
+                    }
+                )">
+                <i class="bi bi-person-lines-fill"></i>
+            </button>
+
+            {% if score.resume.status == 'INTERVIEW_SCHEDULED' %}
+                <form method="post" action="{% url 'update_status' score.id %}" style="display:inline;">
+                    {% csrf_token %}
+                    <input type="hidden" name="action" value="hire">
+                    <button type="submit" class="icon-btn" title="Mark as Hired" style="color: #166534; border-color: #bbf7d0; background: #f0fdf4;">
+                        <i class="bi bi-check-lg"></i>
+                    </button>
+                </form>
+                <form method="post" action="{% url 'update_status' score.id %}" style="display:inline;" onsubmit="return confirm('Reject this candidate?');">
+                    {% csrf_token %}
+                    <input type="hidden" name="action" value="reject">
+                    <button type="submit" class="icon-btn" title="Reject Candidate" style="color: #991b1b; border-color: #fecaca; background: #fef2f2;">
+                        <i class="bi bi-x-lg"></i>
+                    </button>
+                </form>
+
+            {% elif score.resume.status == 'HIRED' %}
+                    <span class="icon-btn" style="background:#dcfce7; color:#166534; border:none; cursor:default;">
+                    <i class="bi bi-trophy-fill"></i>
+                    </span>
+
+            {% else %}
+                {% if score.resume.status == 'NEW' or score.resume.status == 'PENDING' or score.resume.status == 'SHORTLISTED' %}
+                    <button class="icon-btn shortlist-btn" 
+                            title="{% if score.resume.status == 'SHORTLISTED' %}Remove from Shortlist{% else %}Shortlist Candidate{% endif %}" 
+                            onclick="shortlistCandidate({{ score.resume.id }}, this)"
+                            data-status="{{ score.resume.status }}"
+                            style="transition: all 0.2s; 
+                                {% if score.resume.status == 'SHORTLISTED' %}
+                                    color: #ffffff; background: #059669; border-color: #047857; /* Active (Dark Green) */
+                                {% else %}
+                                    color: #059669; background: #ecfdf5; border-color: #a7f3d0; /* Inactive (Light Green) */
+                                {% endif %}">
+                        <i class="bi {% if score.resume.status == 'SHORTLISTED' %}bi-check-circle-fill{% else %}bi-check-circle{% endif %}"></i>
+                    </button>
+                {% endif %}
+
+                {% if score.resume.status != 'AUTO_REJECTED' and score.resume.status != 'INTERVIEW_REJECTED' and score.resume.status != 'REJECTED' %}
+                    {% if score.resume.status == 'SHORTLISTED' or score.resume.status == 'NEW' %}
+                    <button class="icon-btn" title="Schedule Interview" 
+                            onclick="openScheduleModal('{{ score.id }}', '{{ score.resume.candidate_name|escapejs }}', '{{ score.job.name|escapejs }}')">
+                        <i class="bi bi-calendar-event"></i>
+                    </button>
+                    {% endif %}
+                {% endif %}
+
+            {% endif %}
+
+            <label class="fav-wrapper" title="Mark as Favorite" style="margin-left:auto;"> <input type="checkbox" class="fav-input" 
+                        data-resume-id="{{ score.resume.id }}" 
+                        data-field="is_favorite" 
+                        data-value="{% if score.resume.is_favorite %}false{% else %}true{% endif %}"
+                        {% if score.resume.is_favorite %}checked{% endif %} />
+                <div class="icon-btn fav-btn">
+                    <i class="bi {% if score.resume.is_favorite %}bi-star-fill{% else %}bi-star{% endif %}"></i>
+                </div>
+            </label>
+
+            <form method="post" action="{% url 'score_rescore' score.id %}" style="display:inline;" class="rescore-form">
+                {% csrf_token %}
+                <button type="submit" class="icon-btn" title="Rescore">
+                    <i class="bi bi-arrow-clockwise"></i>
+                </button>
+            </form>
+            
+        </div>
+    </div>
+  </div>
+
+  <div class="meta-grid" style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 10px; padding-top: 10px; border-top: 1px solid #f1f5f9;">
+    
+    <div class="meta-item">
+        <i class="bi bi-envelope-at" style="color:#94a3b8;"></i>
+        <span style="font-size:0.8rem;" title="{{ score.resume.candidate_email }}">{{ score.resume.candidate_email|default:"--"|truncatechars:25 }}</span>
+    </div>
+    
+    <div class="meta-item">
+        <i class="bi bi-telephone" style="color:#94a3b8;"></i>
+        {% if score.resume.candidate_phone %}
+            <a href="tel:{{ score.resume.candidate_phone }}" style="font-size:0.8rem; color:inherit; text-decoration:none;">{{ score.resume.candidate_phone }}</a>
+        {% else %}
+            <span style="font-size:0.8rem;">--</span>
+        {% endif %}
+    </div>
+
+    <div class="meta-item">
+        <i class="bi bi-geo-alt" style="color:#94a3b8;"></i>
+        <span style="font-size:0.8rem;">{{ score.resume.candidate_location|default:"--" }}</span>
+    </div>
+
+    <div class="meta-item">
+        <i class="bi bi-calendar3" style="color:#94a3b8;"></i>
+        <span style="font-size:0.8rem;">{{ score.resume.received_at|timezone:"Asia/Kolkata"|date:"M d, Y" }}</span>
+    </div>
+  </div>
+
+  <details class="breakdown-details">
+    <summary>
+        <i class="bi bi-bar-chart-steps"></i> View Screening Breakdown
+    </summary>
+    <div class="table-container">
+        <table class="breakdown-table">
+            <thead>
+                <tr>
+                    <th style="width: 40%">Criteria</th>
+                    <th style="width: 15%">Score</th>
+                    <th>Notes</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for item in score.detail %}
+                <tr>
+                    <td class="criteria-name">{{ item.title }}</td>
+                    <td>
+                        <span class="table-score {% if item.score >= 7.5 %}high{% elif item.score < 4.0 %}low{% endif %}">
+                            {{ item.score }}/10
                         </span>
                     </td>
                     <td class="criteria-notes">{{ item.notes|default:"-" }}</td>

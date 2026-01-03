@@ -121,7 +121,7 @@
          data-current-tab="{{ current_tab }}">
         
         {% if view_mode == "table" %}
-        <div class="table-responsive">
+        <!-- <div class="table-responsive">
             <table class="score-table">
                 <thead>
                     <tr>
@@ -133,6 +133,21 @@
                         <th>Received</th>
                         <th>Total Score</th>
                         <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody id="score-table-body">
+                    {% include "jobs/partials/score_rows.html" %}
+                </tbody>
+            </table>
+        </div> -->
+        <div class="table-responsive">
+            <table class="score-table">
+                <thead>
+                    <tr>
+                        <th style="width: 20%;">Candidate</th>
+                        <th style="width: 10%;">Score</th>
+                        <th style="width: 20%;">Current Role</th> <th style="width: 15%;">Contact</th>      <th style="width: 15%;">Status</th>
+                        <th style="width: 20%;">Actions</th>
                     </tr>
                 </thead>
                 <tbody id="score-table-body">

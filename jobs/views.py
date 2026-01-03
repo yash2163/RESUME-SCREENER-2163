@@ -45,6 +45,13 @@ from .services import (
     check_and_process_automation  # <--- IMPORTED AUTOMATION LOGIC
 )
 
+import requests
+from .services import extract_text_with_links, GeminiEvaluator, check_and_process_automation
+
+import os
+import urllib.parse
+from django.conf import settings
+
 
 from django.conf import settings
 logger = logging.getLogger(__name__)
@@ -125,87 +132,487 @@ def toggle_job_active(request, pk):
     return HttpResponseRedirect(reverse("job_list"))
 
 
+# @login_required
+# def rescore_job(request, pk):
+#     if request.method != "POST":
+#         return HttpResponseBadRequest("Invalid method")
+#     job = get_object_or_404(JobDescription, pk=pk)
+
+#     def run_rescore(job_obj: JobDescription):
+#         """Background rescore to avoid blocking the request."""
+#         from django.db import close_old_connections
+
+#         close_old_connections()
+#         scorer = GeminiEvaluator()
+#         qs = Resume.objects.all().iterator(chunk_size=100)
+#         processed = 0
+#         for resume in qs:
+#             try:
+#                 if not resume.text_content:
+#                     continue
+#                 # total, detail = scorer.score_resume_against_job(resume.text_content, job_obj)
+#                 # NEW CODE (Fix)
+                
+#                 total_score, details, profile = scorer.score_resume_against_job(resume.text_content, job)
+                
+#                 # --- UPDATE: Capture object and trigger automation ---
+#                 score_obj, created = ResumeScore.objects.update_or_create(
+#                     resume=resume, job=job_obj, defaults={"total_score": total, "detail": detail}
+#                 )
+                
+#                 # Trigger Auto-Reject / Shortlist Logic
+#                 check_and_process_automation(score_obj)
+                
+#                 processed += 1
+#             except Exception as exc:
+#                 logger.exception(
+#                     "Job rescore failed for resume",
+#                     extra={"job_id": job_obj.id, "resume_id": resume.id, "error": str(exc)},
+#                 )
+#         logger.info("Job rescore complete", extra={"job_id": job_obj.id, "processed": processed})
+#         close_old_connections()
+
+#     threading.Thread(target=run_rescore, args=(job,), daemon=True).start()
+#     messages.info(request, f"Rescore started for {job.name}. Results will update shortly.")
+#     return redirect(request.META.get("HTTP_REFERER", reverse("job_list")))
+
+
+# current bulk resoring logic but dosen't handle expty text cases
+# @login_required
+# def rescore_job(request, pk):
+#     if request.method != "POST":
+#         return HttpResponseBadRequest("Invalid method")
+    
+#     job = get_object_or_404(JobDescription, pk=pk)
+
+#     def run_rescore(job_obj: JobDescription):
+#         """Background rescore to avoid blocking the request."""
+#         from django.db import close_old_connections
+#         # Import services here to avoid circular import issues at top level
+#         from .services import GeminiEvaluator, check_and_process_automation 
+
+#         close_old_connections()
+#         scorer = GeminiEvaluator()
+        
+#         # Use iterator to save memory
+#         qs = Resume.objects.all().iterator(chunk_size=100)
+#         processed = 0
+        
+#         for resume in qs:
+#             try:
+#                 if not resume.text_content:
+#                     continue
+                
+#                 # 2. Call Gemini
+#                 total_score, details, profile = scorer.score_resume_against_job(resume.text_content, job_obj)
+                
+#                 # 3. FIX: Save extracted Metadata (Including NEW fields)
+#                 if profile:
+#                     updated = False
+                    
+#                     # Backfill basic info
+#                     if profile.get('name') and not resume.candidate_name:
+#                         resume.candidate_name = profile['name']
+#                         updated = True
+#                     if profile.get('email') and not resume.candidate_email:
+#                         resume.candidate_email = profile['email']
+#                         updated = True
+#                     if profile.get('phone') and not resume.candidate_phone:
+#                         resume.candidate_phone = profile['phone']
+#                         updated = True
+#                     if profile.get('linkedin_url') and not resume.linkedin_profile:
+#                         resume.linkedin_profile = profile['linkedin_url']
+#                         updated = True
+                    
+#                     # Backfill NEW Metadata fields
+#                     if profile.get('current_role') and not resume.candidate_role:
+#                         resume.candidate_role = profile['current_role']
+#                         updated = True
+#                     if profile.get('current_company') and not resume.candidate_company:
+#                         resume.candidate_company = profile['current_company']
+#                         updated = True
+#                     if profile.get('current_location') and not resume.candidate_location:
+#                         resume.candidate_location = profile['current_location']
+#                         updated = True
+                    
+#                     if updated:
+#                         resume.save()
+
+#                 # 4. Save Score
+#                 score_obj, created = ResumeScore.objects.update_or_create(
+#                     resume=resume, 
+#                     job=job_obj, 
+#                     defaults={"total_score": total_score, "detail": details}
+#                 )
+                
+#                 # 5. Trigger Automation (Direct call, no fragile globals check)
+#                 check_and_process_automation(score_obj)
+                
+#                 processed += 1
+                
+#             except Exception as exc:
+#                 logger.exception(
+#                     "Job rescore failed for resume",
+#                     extra={"job_id": job_obj.id, "resume_id": resume.id, "error": str(exc)},
+#                 )
+                
+#         logger.info("Job rescore complete", extra={"job_id": job_obj.id, "processed": processed})
+#         close_old_connections()
+
+#     # Start Thread
+#     threading.Thread(target=run_rescore, args=(job,), daemon=True).start()
+    
+#     messages.info(request, f"Rescore started for {job.name}. Results will update shortly.")
+#     return redirect(request.META.get("HTTP_REFERER", reverse("job_list")))
+
+
+import os
+import urllib.parse
+from django.conf import settings
+# ... existing imports
+
 @login_required
 def rescore_job(request, pk):
     if request.method != "POST":
         return HttpResponseBadRequest("Invalid method")
+    
     job = get_object_or_404(JobDescription, pk=pk)
 
     def run_rescore(job_obj: JobDescription):
-        """Background rescore to avoid blocking the request."""
+        """Background rescore that AUTO-FIXES missing text."""
         from django.db import close_old_connections
+        from .services import GeminiEvaluator, check_and_process_automation, extract_text_with_links
 
         close_old_connections()
         scorer = GeminiEvaluator()
+        
+        # Use iterator to save memory
         qs = Resume.objects.all().iterator(chunk_size=100)
         processed = 0
+        fixed_count = 0
+        
         for resume in qs:
             try:
+                # --- STEP 1: AUTO-FIX TEXT IF MISSING ---
+                if not resume.text_content or len(resume.text_content.strip()) < 50:
+                    try:
+                        file_content = None
+                        filename = resume.attachment_name or "document.pdf"
+
+                        # Logic to find file locally (Same as Single Rescore)
+                        if resume.file_url:
+                            # Clean URL
+                            relative_path = resume.file_url
+                            if relative_path.startswith(settings.MEDIA_URL):
+                                relative_path = relative_path.replace(settings.MEDIA_URL, "", 1)
+                            
+                            relative_path = urllib.parse.unquote(relative_path)
+                            local_path = os.path.join(settings.MEDIA_ROOT, relative_path)
+
+                            # Try Primary Path
+                            if os.path.exists(local_path):
+                                with open(local_path, 'rb') as f:
+                                    file_content = f.read()
+                            else:
+                                # Try Fallback Path
+                                alt_path = os.path.join("/code", relative_path.lstrip('/'))
+                                if os.path.exists(alt_path):
+                                    with open(alt_path, 'rb') as f:
+                                        file_content = f.read()
+
+                        # Re-Extract
+                        if file_content:
+                            new_text = extract_text_with_links(file_content, filename=filename)
+                            if new_text and len(new_text) > 50:
+                                resume.text_content = new_text
+                                resume.save()
+                                fixed_count += 1
+                                logger.info(f"Auto-fixed text for resume {resume.id}")
+                    except Exception as e:
+                        logger.warning(f"Failed to auto-fix resume {resume.id}: {e}")
+
+                # If text is STILL missing after auto-fix attempt, skip
                 if not resume.text_content:
                     continue
-                total, detail = scorer.score_resume_against_job(resume.text_content, job_obj)
                 
-                # --- UPDATE: Capture object and trigger automation ---
+                # --- STEP 2: CALL GEMINI ---
+                total_score, details, profile = scorer.score_resume_against_job(resume.text_content, job_obj)
+                
+                # --- STEP 3: UPDATE METADATA (Aggressive Update) ---
+                if profile:
+                    updated = False
+                    
+                    # Helper to update if value is different (Better than only if empty)
+                    def update_field(field, value):
+                        if value and getattr(resume, field) != value:
+                            setattr(resume, field, value)
+                            return True
+                        return False
+
+                    if update_field('candidate_name', profile.get('name')): updated = True
+                    if update_field('candidate_email', profile.get('email')): updated = True
+                    if update_field('candidate_phone', profile.get('phone')): updated = True
+                    if update_field('linkedin_profile', profile.get('linkedin_url')): updated = True
+                    
+                    if update_field('candidate_role', profile.get('current_role')): updated = True
+                    if update_field('candidate_company', profile.get('current_company')): updated = True
+                    if update_field('candidate_location', profile.get('current_location')): updated = True
+                    
+                    if updated:
+                        resume.save()
+
+                # --- STEP 4: SAVE SCORE ---
                 score_obj, created = ResumeScore.objects.update_or_create(
-                    resume=resume, job=job_obj, defaults={"total_score": total, "detail": detail}
+                    resume=resume, 
+                    job=job_obj, 
+                    defaults={"total_score": total_score, "detail": details}
                 )
                 
-                # Trigger Auto-Reject / Shortlist Logic
+                # --- STEP 5: AUTOMATION ---
                 check_and_process_automation(score_obj)
                 
                 processed += 1
+                
             except Exception as exc:
                 logger.exception(
                     "Job rescore failed for resume",
                     extra={"job_id": job_obj.id, "resume_id": resume.id, "error": str(exc)},
                 )
-        logger.info("Job rescore complete", extra={"job_id": job_obj.id, "processed": processed})
+                
+        logger.info(f"Rescore complete. Processed: {processed}, Fixed Text: {fixed_count}")
         close_old_connections()
 
+    # Start Thread
     threading.Thread(target=run_rescore, args=(job,), daemon=True).start()
-    messages.info(request, f"Rescore started for {job.name}. Results will update shortly.")
+    
+    messages.info(request, f"Rescore started for {job.name}. It will repair and rescore resumes in the background.")
     return redirect(request.META.get("HTTP_REFERER", reverse("job_list")))
 
+
+# @login_required
+# def rescore_single_score(request, score_id):
+#     if request.method != "POST":
+#         return HttpResponseBadRequest("Invalid method")
+#     score = get_object_or_404(ResumeScore.objects.select_related("resume", "job"), pk=score_id)
+#     scorer = GeminiEvaluator()
+
+#     def respond(success: bool, message: str, payload=None, status=200):
+#         if request.headers.get("x-requested-with") == "XMLHttpRequest":
+#             data = {"success": success, "message": message}
+#             if payload:
+#                 data.update(payload)
+#             return JsonResponse(data, status=status if success else 400)
+#         if success:
+#             messages.success(request, message)
+#         else:
+#             messages.error(request, message)
+#         return redirect(request.META.get("HTTP_REFERER", reverse("dashboard")))
+
+#     if not score.resume.text_content:
+#         return respond(False, "No resume text available to rescore.")
+
+#     try:
+#         total, detail = scorer.score_resume_against_job(score.resume.text_content, score.job)
+#         score.total_score = total
+#         score.detail = detail
+#         score.save(update_fields=["total_score", "detail"])
+        
+#         # --- UPDATE: Trigger Auto-Reject / Shortlist Logic ---
+#         check_and_process_automation(score)
+        
+#         return respond(
+#             True,
+#             f"Rescored {score.resume.attachment_name} for {score.job.name}.",
+#             payload={"total_score": total},
+#         )
+#     except Exception as exc:
+#         logger.exception("Individual rescore failed", extra={"score_id": score_id, "error": str(exc)})
+#         return respond(False, "Rescore failed. Please try again.")
+
+
+# currently usinf, only uses already extracted texts
+
+# @login_required
+# def rescore_single_score(request, score_id):
+#     if request.method != "POST":
+#         return HttpResponseBadRequest("Invalid method")
+        
+#     score = get_object_or_404(ResumeScore.objects.select_related("resume", "job"), pk=score_id)
+    
+#     # Import here to ensure availability
+#     from .services import GeminiEvaluator, check_and_process_automation
+
+#     scorer = GeminiEvaluator()
+
+#     def respond(success: bool, message: str, payload=None, status=200):
+#         if request.headers.get("x-requested-with") == "XMLHttpRequest":
+#             data = {"success": success, "message": message}
+#             if payload:
+#                 data.update(payload)
+#             return JsonResponse(data, status=status if success else 400)
+#         if success:
+#             messages.success(request, message)
+#         else:
+#             messages.error(request, message)
+#         return redirect(request.META.get("HTTP_REFERER", reverse("dashboard")))
+
+#     if not score.resume.text_content:
+#         return respond(False, "No resume text available to rescore.")
+
+#     try:
+#         # 1. Call Gemini
+#         total, detail, profile = scorer.score_resume_against_job(score.resume.text_content, score.job)
+        
+#         # 2. Update Score Object
+#         score.total_score = total
+#         score.detail = detail
+#         score.save(update_fields=["total_score", "detail"])
+        
+#         # 3. FIX: Update Candidate Metadata (Including NEW fields)
+#         if profile:
+#             resume_updated = False
+#             resume = score.resume
+            
+#             # Standard Fields
+#             if profile.get('name') and not resume.candidate_name:
+#                 resume.candidate_name = profile['name']
+#                 resume_updated = True
+#             if profile.get('email') and not resume.candidate_email:
+#                 resume.candidate_email = profile['email']
+#                 resume_updated = True
+#             if profile.get('phone') and not resume.candidate_phone:
+#                 resume.candidate_phone = profile['phone']
+#                 resume_updated = True
+#             if profile.get('linkedin_url') and not resume.linkedin_profile:
+#                 resume.linkedin_profile = profile['linkedin_url']
+#                 resume_updated = True
+            
+#             # NEW Metadata Fields
+#             if profile.get('current_role') and not resume.candidate_role:
+#                 resume.candidate_role = profile['current_role']
+#                 resume_updated = True
+#             if profile.get('current_company') and not resume.candidate_company:
+#                 resume.candidate_company = profile['current_company']
+#                 resume_updated = True
+#             if profile.get('current_location') and not resume.candidate_location:
+#                 resume.candidate_location = profile['current_location']
+#                 resume_updated = True
+                
+#             if resume_updated:
+#                 resume.save()
+
+#         # 4. Trigger Automation
+#         check_and_process_automation(score)
+        
+#         return respond(
+#             True,
+#             f"Rescored {score.resume.candidate_name} for {score.job.name}.",
+#             payload={"total_score": total},
+#         )
+        
+#     except Exception as exc:
+#         logger.exception("Individual rescore failed", extra={"score_id": score_id, "error": str(exc)})
+#         return respond(False, "Rescore failed. Please try again.")
+
+
+# Used to handle no text extracted but looks gcp for resumes
 
 @login_required
 def rescore_single_score(request, score_id):
     if request.method != "POST":
         return HttpResponseBadRequest("Invalid method")
+        
     score = get_object_or_404(ResumeScore.objects.select_related("resume", "job"), pk=score_id)
     scorer = GeminiEvaluator()
 
     def respond(success: bool, message: str, payload=None, status=200):
         if request.headers.get("x-requested-with") == "XMLHttpRequest":
             data = {"success": success, "message": message}
-            if payload:
-                data.update(payload)
+            if payload: data.update(payload)
             return JsonResponse(data, status=status if success else 400)
-        if success:
-            messages.success(request, message)
-        else:
-            messages.error(request, message)
+        if success: messages.success(request, message)
+        else: messages.error(request, message)
         return redirect(request.META.get("HTTP_REFERER", reverse("dashboard")))
 
+    # --- AUTO-FIX LOGIC STARTS HERE ---
+    # If text is empty or suspiciously short (< 50 chars), re-download and extract
+    if not score.resume.text_content or len(score.resume.text_content.strip()) < 50:
+        try:
+            # Determine the best URL to download from (Signed URL is safer if GCS is private)
+            download_url = getattr(score.resume, 'signed_url', None) or score.resume.file_url
+            
+            if download_url and download_url.startswith('http'):
+                logger.info(f"Attempting to re-download resume for {score.resume.id}...")
+                response = requests.get(download_url)
+                
+                if response.status_code == 200:
+                    # Use your NEW robust extractor
+                    new_text = extract_text_with_links(
+                        response.content, 
+                        filename=score.resume.attachment_name or "document.pdf"
+                    )
+                    
+                    if new_text and len(new_text) > 50:
+                        score.resume.text_content = new_text
+                        score.resume.save()
+                        logger.info(f"Successfully re-extracted text for resume {score.resume.id}")
+                    else:
+                        logger.warning(f"Re-extraction yielded empty text for {score.resume.id}")
+        except Exception as e:
+            logger.error(f"Failed to auto-fix resume text: {e}")
+    # --- AUTO-FIX LOGIC ENDS HERE ---
+
     if not score.resume.text_content:
-        return respond(False, "No resume text available to rescore.")
+        return respond(False, "No resume text available (and re-extraction failed).")
 
     try:
-        total, detail = scorer.score_resume_against_job(score.resume.text_content, score.job)
+        # 1. Call Gemini
+        total, detail, profile = scorer.score_resume_against_job(score.resume.text_content, score.job)
+        
+        # 2. Update Score
         score.total_score = total
         score.detail = detail
         score.save(update_fields=["total_score", "detail"])
         
-        # --- UPDATE: Trigger Auto-Reject / Shortlist Logic ---
+        # 3. Update Metadata (Force Update)
+        if profile:
+            resume = score.resume
+            updated_fields = []
+            
+            def update_field(field, value):
+                # Update if value exists and is different
+                if value or getattr(resume, field) != value:
+                    setattr(resume, field, value)
+                    updated_fields.append(field)
+
+            update_field('candidate_name', profile.get('name'))
+            update_field('candidate_email', profile.get('email'))
+            update_field('candidate_phone', profile.get('phone'))
+            update_field('linkedin_profile', profile.get('linkedin_url'))
+            update_field('candidate_role', profile.get('current_role'))
+            update_field('candidate_company', profile.get('current_company'))
+            update_field('candidate_location', profile.get('current_location'))
+            
+            if updated_fields:
+                resume.save(update_fields=updated_fields)
+
+        # 4. Trigger Automation
         check_and_process_automation(score)
         
         return respond(
             True,
-            f"Rescored {score.resume.attachment_name} for {score.job.name}.",
+            f"Rescored {score.resume.candidate_name}. Score: {total:.1f}/100",
             payload={"total_score": total},
         )
+        
     except Exception as exc:
         logger.exception("Individual rescore failed", extra={"score_id": score_id, "error": str(exc)})
         return respond(False, "Rescore failed. Please try again.")
+
+
+
+
+
 
 
 # @login_required

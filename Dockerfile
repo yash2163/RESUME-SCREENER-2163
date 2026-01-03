@@ -5,7 +5,14 @@ ENV PYTHONUNBUFFERED=1
 
 WORKDIR /code
 
-RUN apt-get update && apt-get install -y build-essential libpq-dev && rm -rf /var/lib/apt/lists/*
+# UPDATED: Added tesseract-ocr, poppler-utils, and antiword
+RUN apt-get update && apt-get install -y \
+    build-essential \
+    libpq-dev \
+    tesseract-ocr \
+    poppler-utils \
+    antiword \
+    && rm -rf /var/lib/apt/lists/*
 
 COPY requirements.txt /code/
 RUN pip install --no-cache-dir -r requirements.txt
