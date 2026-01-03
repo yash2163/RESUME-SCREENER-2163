@@ -250,6 +250,8 @@ class Resume(models.Model):
     received_at = models.DateTimeField()
     created_at = models.DateTimeField(auto_now_add=True)
 
+    ingest_failures = models.IntegerField(default=0)
+
     # --- ENHANCED TRACKING FIELDS ---
     STATUS_CHOICES = [
         ('NEW', 'New / Pending'),             # Just arrived, not scored yet
